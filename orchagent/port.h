@@ -44,6 +44,7 @@ public:
         LOOPBACK,
         VLAN,
         LAG,
+        TUNNEL,
         SUBPORT,
         UNKNOWN
     } ;
@@ -85,6 +86,7 @@ public:
     sai_object_id_t     m_hif_id = 0;
     sai_object_id_t     m_lag_id = 0;
     sai_object_id_t     m_lag_member_id = 0;
+    sai_object_id_t     m_tunnel_id = 0;
     sai_object_id_t     m_ingress_acl_table_group_id = 0;
     sai_object_id_t     m_egress_acl_table_group_id = 0;
     vlan_members_t      m_vlan_members;
@@ -97,6 +99,7 @@ public:
     sai_port_priority_flow_control_mode_t m_pfc_asym = SAI_PORT_PRIORITY_FLOW_CONTROL_MODE_COMBINED;
     uint8_t m_pfc_bitmask = 0;
     uint32_t m_nat_zone_id = 0;
+    uint32_t m_vnid = 0xFFFFFFFF;
 
     /*
      * Following two bit vectors are used to lock

@@ -510,7 +510,7 @@ VnetBridgeInfo VNetBitmapObject::getBridgeInfoByVni(uint32_t vni, string tunnelN
     }
 
     // FIXME: Use "createVxlanTunnelMap()" for tunnel mapper creation
-    auto tunnelEncapMapperEntry = tunnel->addEncapMapperEntry(info.bridge_id, vni);
+    auto tunnelEncapMapperEntry = tunnel->addEncapMapperEntry(info.bridge_id, vni,TUNNEL_MAP_T_BRIDGE);
     tunnel->insertMapperEntry(tunnelEncapMapperEntry, SAI_NULL_OBJECT_ID, vni);
 
     info.use_count = 1;

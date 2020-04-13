@@ -2,6 +2,8 @@
 #include "intfsorch.h"
 #include "bufferorch.h"
 #include "neighorch.h"
+#include "vxlanorch.h"
+#include "directory.h"
 
 #include <inttypes.h>
 #include <cassert>
@@ -39,6 +41,7 @@ extern IntfsOrch *gIntfsOrch;
 extern NeighOrch *gNeighOrch;
 extern CrmOrch *gCrmOrch;
 extern BufferOrch *gBufferOrch;
+extern Directory<Orch*> gDirectory;
 
 #define VLAN_PREFIX         "Vlan"
 #define DEFAULT_VLAN_ID     1
@@ -1064,6 +1067,9 @@ bool PortsOrch::setPortPvid(Port &port, sai_uint32_t pvid)
 {
     SWSS_LOG_ENTER();
 
+    if(port.m_type == Port::TUNNEL)
+      return true;
+
     if (port.m_rif_id)
     {
         SWSS_LOG_ERROR("pvid setting for router interface %s is not allowed", port.m_alias.c_str());
@@ -1127,6 +1133,9 @@ bool PortsOrch::setHostIntfsStripTag(Port &port, sai_hostif_vlan_tag_t strip)
 {
     SWSS_LOG_ENTER();
     vector<Port> portv;
+
+    if(port.m_type == Port::TUNNEL)
+       return true;
 
     /*
      * Before SAI_HOSTIF_VLAN_TAG_ORIGINAL is supported by libsai from all asic vendors,
@@ -1380,6 +1389,13 @@ bool PortsOrch::setHostIntfsOperStatus(const Port& port, bool isUp) const
 void PortsOrch::updateDbPortOperStatus(const Port& port, sai_port_oper_status_t status) const
 {
     SWSS_LOG_ENTER();
+
+    if(port.m_type == Port::TUNNEL)
+    {
+      VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
+      tunnel_orch->updateDbTunnelOperStatus(port.m_alias, status);
+      return;
+    }
 
     vector<FieldValueTuple> tuples;
     FieldValueTuple tuple("oper_status", oper_status_strings.at(status));
@@ -2906,6 +2922,48 @@ bool PortsOrch::addBridgePort(Port &port)
     sai_attribute_t attr;
     vector<sai_attribute_t> attrs;
 
+    if (port.m_type == Port::PHY)
+    {
+      attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
+      attr.value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
+      attrs.push_back(attr);
+
+      attr.id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
+      attr.value.oid = port.m_port_id;
+      attrs.push_back(attr);
+    }
+    else if  (port.m_type == Port::LAG)
+    {
+      attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
+      attr.value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
+      attrs.push_back(attr);
+
+      attr.id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
+      attr.value.oid = port.m_lag_id;
+      attrs.push_back(attr);
+    }
+    else if  (port.m_type == Port::TUNNEL)
+    {
+      attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
+      attr.value.s32 = SAI_BRIDGE_PORT_TYPE_TUNNEL;
+      attrs.push_back(attr);
+
+      attr.id = SAI_BRIDGE_PORT_ATTR_TUNNEL_ID;
+      attr.value.oid = port.m_tunnel_id;
+      attrs.push_back(attr);
+
+      attr.id = SAI_BRIDGE_PORT_ATTR_BRIDGE_ID;
+      attr.value.oid = m_default1QBridge;
+      attrs.push_back(attr);
+    }
+    else
+    {
+        SWSS_LOG_ERROR("Failed to add bridge port %s to default 1Q bridge, invalid port type %d",
+            port.m_alias.c_str(), port.m_type);
+        return false;
+    }
+
+#if 0
     attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
     attr.value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
     attrs.push_back(attr);
@@ -2926,6 +2984,7 @@ bool PortsOrch::addBridgePort(Port &port)
         return false;
     }
     attrs.push_back(attr);
+#endif
 
     /* Create a bridge port with admin status set to UP */
     attr.id = SAI_BRIDGE_PORT_ATTR_ADMIN_STATE;
@@ -3095,6 +3154,14 @@ bool PortsOrch::removeVlan(Port vlan)
         return false;
     }
 
+    // Fail VLAN removal if there is a vnid associated
+    if (vlan.m_vnid != 0xFFFFFFFF)
+    {
+       SWSS_LOG_ERROR("VLAN-VNI mapping not yet removed. VLAN %s VNI %d",
+                      vlan.m_alias.c_str(), vlan.m_vnid);
+       return false;
+    }
+
     sai_status_t status = sai_vlan_api->remove_vlan(vlan.m_vlan_info.vlan_oid);
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -3231,6 +3298,26 @@ bool PortsOrch::removeVlanMember(Port &vlan, Port &port)
     notify(SUBJECT_TYPE_VLAN_MEMBER_CHANGE, static_cast<void *>(&update));
 
     return true;
+}
+
+bool PortsOrch::isVlanMember(Port &vlan, Port &port)
+{
+    if (vlan.m_members.find(port.m_alias) == vlan.m_members.end())
+       return false;
+
+    return true;
+}
+
+uint32_t  PortsOrch::getNumVlanMember(Port &port)
+{
+    uint32_t num;
+
+    if(m_portVlanMember.find(port.m_alias) == m_portVlanMember.end())
+      return 0;
+
+    num =(uint32_t) (m_portVlanMember[port.m_alias].size());
+
+    return num;
 }
 
 bool PortsOrch::addLag(string lag_alias)
@@ -3457,6 +3544,34 @@ bool PortsOrch::setDistributionOnLagMember(Port &lagMember, bool enableDistribut
     return true;
 }
 
+bool PortsOrch::addTunnel(string tunnel_alias, sai_object_id_t tunnel_id, bool hwlearning)
+{
+    SWSS_LOG_ENTER();
+
+    Port tunnel(tunnel_alias, Port::TUNNEL);
+    tunnel.m_tunnel_id = tunnel_id;
+    if(hwlearning)
+      tunnel.m_learn_mode = "hardware";
+    else
+      tunnel.m_learn_mode = "disable";
+    m_portList[tunnel_alias] = tunnel;
+    portOidToName[tunnel_id] = tunnel_alias;
+
+    SWSS_LOG_WARN("addTunnel:: 0x%lx",tunnel_id);
+
+    return true;
+}
+
+bool PortsOrch::removeTunnel(Port tunnel)
+{
+    SWSS_LOG_ENTER();
+
+    portOidToName.erase(tunnel.m_tunnel_id);
+    m_portList.erase(tunnel.m_alias);
+
+    return true;
+}
+
 void PortsOrch::generateQueueMap()
 {
     if (m_isQueueMapGenerated)
@@ -3661,6 +3776,9 @@ void PortsOrch::updatePortOperStatus(Port &port, sai_port_oper_status_t status)
 
     updateDbPortOperStatus(port, status);
     port.m_oper_status = status;
+
+    if(port.m_type == Port::TUNNEL)
+      return;
 
     bool isUp = status == SAI_PORT_OPER_STATUS_UP;
     if (!setHostIntfsOperStatus(port, isUp))
