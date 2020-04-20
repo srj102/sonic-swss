@@ -224,6 +224,8 @@ private:
     bool removeVlan(Port vlan);
     bool addVlanMember(Port &vlan, Port &port, string& tagging_mode);
     bool removeVlanMember(Port &vlan, Port &port);
+    bool isVlanMember(Port &vlan, Port &port);
+    uint32_t  getNumVlanMember(Port &port);
 
     bool addLag(string lag);
     bool removeLag(Port lag);
@@ -231,6 +233,9 @@ private:
     bool removeLagMember(Port &lag, Port &port);
     bool setCollectionOnLagMember(Port &lagMember, bool enableCollection);
     bool setDistributionOnLagMember(Port &lagMember, bool enableDistribution);
+
+    bool addTunnel(string tunnel,sai_object_id_t, bool learning=true);
+    bool removeTunnel(Port tunnel);
 
     bool addPort(const set<int> &lane_set, uint32_t speed, int an=0, string fec="");
     sai_status_t removePort(sai_object_id_t port_id);
@@ -278,6 +283,9 @@ private:
                                 sai_acl_bind_point_type_t &sai_acl_bind_type);
     void initGearbox();
     bool initGearboxPort(Port &port);
+    friend class VxlanTunnelOrch;
+    friend class EvpnRemoteVniOrch;
+    
 };
 #endif /* SWSS_PORTSORCH_H */
 
