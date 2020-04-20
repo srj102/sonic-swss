@@ -881,7 +881,7 @@ bool IntfsOrch::removeRouterIntfs(Port &port)
 
     if (m_syncdIntfses[port.m_alias].ref_count > 0)
     {
-        SWSS_LOG_NOTICE("Router interface is still referenced");
+        SWSS_LOG_NOTICE("Router interface %s is still referenced, Ref Cnt: %d", port.m_alias.c_str(), m_syncdIntfses[port.m_alias].ref_count);
         return false;
     }
 
