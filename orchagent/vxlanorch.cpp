@@ -1839,9 +1839,13 @@ bool VxlanVrfMapOrch::addOperation(const Request& request)
     string vrf_name = request.getAttrString("vrf");
     VRFOrch* vrf_orch = gDirectory.get<VRFOrch*>();
 
+    SWSS_LOG_NOTICE("VRF VNI mapping '%s' update vrf %s, vni %d",
+            full_map_entry_name.c_str(), vrf_name.c_str(), vni_id);
     if (vrf_orch->isVRFexists(vrf_name))
     {
-        tunnel_obj->createTunnel(MAP_T::VRID_TO_VNI, MAP_T::VNI_TO_VRID);
+        if (!tunnel_obj->isActive()) {
+            tunnel_obj->createTunnel(MAP_T::VRID_TO_VNI, MAP_T::VNI_TO_VRID);
+        }
         vrf_id = vrf_orch->getVRFid(vrf_name);
     }
     else
@@ -1882,8 +1886,55 @@ bool VxlanVrfMapOrch::delOperation(const Request& request)
 {
     SWSS_LOG_ENTER();
 
-    SWSS_LOG_ERROR("DEL operation is not implemented");
+    VRFOrch* vrf_orch = gDirectory.get<VRFOrch*>();
+    const auto full_map_entry_name = request.getFullKey();
 
+    if (!isVrfMapExists(full_map_entry_name))
+    {
+        SWSS_LOG_ERROR("VxlanVrfMapOrch Vxlan map '%s' do not exist", full_map_entry_name.c_str());
+        return false;
+    }
+
+    size_t pos = full_map_entry_name.find("Vrf");
+    if (pos == string::npos) {
+        SWSS_LOG_ERROR("VxlanVrfMapOrch no VRF in Vxlan map '%s'", full_map_entry_name.c_str());
+        return false;
+    }
+    string vrf_name = full_map_entry_name.substr(pos);
+
+    if (!vrf_orch->isVRFexists(vrf_name))
+    {
+        SWSS_LOG_ERROR("VxlanVrfMapOrch VRF '%s' not present", vrf_name.c_str());
+        return false;
+    }
+    SWSS_LOG_NOTICE("VxlanVrfMapOrch VRF VNI mapping '%s' remove vrf %s", full_map_entry_name.c_str(), vrf_name.c_str());
+    vrf_map_entry_t entry;
+    try
+    {
+        /*
+         * Remove encap and decap mapper
+         */
+        entry = vxlan_vrf_table_[full_map_entry_name];
+
+        SWSS_LOG_NOTICE("VxlanVrfMapOrch Vxlan tunnel VRF encap entry '%lx' decap entry '0x%lx'",
+                entry.encap_id, entry.decap_id);
+
+        remove_tunnel_map_entry(entry.encap_id);
+        vrf_orch->decreaseVrfRefCount(vrf_name);
+        remove_tunnel_map_entry(entry.decap_id);
+        vrf_orch->decreaseVrfRefCount(vrf_name);
+        vxlan_vrf_table_.erase(full_map_entry_name);
+        vxlan_vrf_tunnel_.erase(vrf_name);
+    }
+    catch(const std::runtime_error& error)
+    {
+        SWSS_LOG_ERROR("VxlanVrfMapOrch Error removing tunnel map entry. Entry: %s. Error: %s",
+            full_map_entry_name.c_str(), error.what());
+        return false;
+    }
+
+    SWSS_LOG_NOTICE("VxlanVrfMapOrch Vxlan vrf map entry '%s' is removed. VRF Refcnt %d", full_map_entry_name.c_str(),
+            vrf_orch->getVrfRefCount(vrf_name));
     return true;
 }
 
