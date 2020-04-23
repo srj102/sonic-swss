@@ -10,6 +10,7 @@
 #include "macaddress.h"
 #include "producertable.h"
 #include "flex_counter_manager.h"
+#include "notificationproducer.h"
 
 #define FCS_LEN 4
 #define VLAN_TAG_LEN 4
@@ -72,12 +73,14 @@ public:
     void decreasePortRefCount(const string &alias);
     bool getPortByBridgePortId(sai_object_id_t bridge_port_id, Port &port);
     void setPort(string alias, Port port);
+    void erasePort(string alias);
     void getCpuPort(Port &port);
     bool getVlanByVlanId(sai_vlan_id_t vlan_id, Port &vlan);
     bool getAclBindPortId(string alias, sai_object_id_t &port_id);
 
     bool setHostIntfsOperStatus(const Port& port, bool up) const;
     void updateDbPortOperStatus(const Port& port, sai_port_oper_status_t status) const;
+    void updateDbVlanOperStatus(const Port& port, string status) const;
     bool createBindAclTableGroup(sai_object_id_t id, sai_object_id_t &group_oid, acl_stage_type_t acl_stage = ACL_STAGE_EGRESS);
     bool bindAclTable(sai_object_id_t id, sai_object_id_t table_oid, sai_object_id_t &group_member_oid, acl_stage_type_t acl_stage = ACL_STAGE_INGRESS);
 
@@ -95,7 +98,9 @@ public:
     bool updateL3VniStatus(uint16_t vlan_id, bool status);
 private:
     unique_ptr<Table> m_counterTable;
+    unique_ptr<Table> m_counterLagTable;
     unique_ptr<Table> m_portTable;
+    unique_ptr<Table> m_vlanTable;
     unique_ptr<Table> m_queueTable;
     unique_ptr<Table> m_queuePortTable;
     unique_ptr<Table> m_queueIndexTable;
@@ -105,6 +110,7 @@ private:
     unique_ptr<Table> m_pgIndexTable;
     unique_ptr<ProducerTable> m_flexCounterTable;
     unique_ptr<ProducerTable> m_flexCounterGroupTable;
+    NotificationProducer* notifications;
 
     std::string getQueueWatermarkFlexCounterTableKey(std::string s);
     std::string getPriorityGroupWatermarkFlexCounterTableKey(std::string s);
@@ -121,7 +127,8 @@ private:
     Port m_cpuPort;
     // TODO: Add Bridge/Vlan class
     sai_object_id_t m_default1QBridge;
-    sai_object_id_t m_defaultVlan;
+    sai_object_id_t m_defaultVlan_ObjId;
+    sai_vlan_id_t   m_defaultVlan_Id;
 
     typedef enum
     {
@@ -135,6 +142,14 @@ private:
     map<set<int>, sai_object_id_t> m_portListLaneMap;
     map<set<int>, tuple<string, uint32_t, int, string>> m_lanesAliasSpeedMap;
     map<string, Port> m_portList;
+
+    /* mapping from SAI object ID to Name for faster 
+       retrieval of Port/VLAN from object ID for events
+
+       coming from SAI
+     */
+    unordered_map<sai_object_id_t, string> portOidToName;
+
     map<string, uint32_t> m_port_ref_count;
     unordered_set<string> m_pendingPortSet;
 
@@ -225,7 +240,7 @@ private:
                                 vector<uint32_t> &serdes_val);
     friend class VxlanTunnelOrch;
     friend class EvpnRemoteVniOrch;
-    
+    void updateLagOperStatus(Port &port, sai_port_oper_status_t status);
 };
 #endif /* SWSS_PORTSORCH_H */
 
