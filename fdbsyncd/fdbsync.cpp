@@ -23,38 +23,31 @@ using namespace swss;
 
 #define VXLAN_BR_IF_NAME_PREFIX    "Brvxlan"
 
-extern void fdbsync_debug_install_clis();
-
 FdbSync::FdbSync(RedisPipeline *pipelineAppDB, DBConnector *stateDb) :
     m_fdbTable(pipelineAppDB, APP_VXLAN_FDB_TABLE_NAME),
     m_imetTable(pipelineAppDB, APP_EVPN_REMOTE_VNI_TABLE_NAME),
-    /*m_stateFdbRestoreTable(stateDb, STATE_EVPN_FDB_RESTORE_TABLE_NAME),*/
+    m_stateFdbRestoreTable(stateDb, STATE_EVPN_FDB_RESTORE_TABLE_NAME),
     m_fdbStateTable(stateDb, STATE_FDB_TABLE_NAME)
 {
-#if 0
     m_AppRestartAssist = new AppRestartAssist(pipelineAppDB, "fdbsyncd", "swss", DEFAULT_FDBSYNC_WARMSTART_TIMER);
     if (m_AppRestartAssist)
     {
         m_AppRestartAssist->registerAppTable(APP_VXLAN_FDB_TABLE_NAME, &m_fdbTable);
         m_AppRestartAssist->registerAppTable(APP_EVPN_REMOTE_VNI_TABLE_NAME, &m_imetTable);
     }
-#endif
 }
 
 FdbSync::~FdbSync()
 {
-#if 0
     if (m_AppRestartAssist)
     {
         delete m_AppRestartAssist;
     }
-#endif
 }
 
 // Check if neighbor table is restored in kernel
 bool FdbSync::isFdbRestoreDone()
 {
-#if 0
     string value;
 
     m_stateFdbRestoreTable.hget("Flags", "restored", value);
@@ -63,8 +56,6 @@ bool FdbSync::isFdbRestoreDone()
         SWSS_LOG_NOTICE("neighbor table restore to kernel is done");
         return true;
     }
-    return false;
-#endif
     return true;
 }
 
@@ -297,22 +288,24 @@ void FdbSync::imetAddRoute(struct in_addr vtep, string vlan_str, uint32_t vni)
     if (!checkImetExit(key, vni))
         return;
 
-    SWSS_LOG_NOTICE("IMET Add route key:%s vtep:%s %s", key.c_str(), inet_ntoa(vtep), vlan_id.c_str());
+	SWSS_LOG_NOTICE("%sIMET Add route key:%s vtep:%s %s", 
+			m_AppRestartAssist->isWarmStartInProgress() ? "WARM-RESTART:" : "",
+			key.c_str(), inet_ntoa(vtep), vlan_id.c_str());
 
     std::vector<FieldValueTuple> fvVector;
     FieldValueTuple f("vni", to_string(vni));
     fvVector.push_back(f);
 
     imet_route[key].redist_add_status = true;
-#if 0
-    // If warmstart is in progress, we take all netlink changes into the cache map
+    
+	// If warmstart is in progress, we take all netlink changes into the cache map
     if (m_AppRestartAssist->isWarmStartInProgress())
     {
         m_AppRestartAssist->insertToMap(APP_EVPN_REMOTE_VNI_TABLE_NAME, key, fvVector, false);
         return;
     }
-#endif
-    m_imetTable.set(key, fvVector);
+    
+	m_imetTable.set(key, fvVector);
     return;
 }
 
@@ -324,21 +317,22 @@ void FdbSync::imetDelRoute(struct in_addr vtep, string vlan_str, uint32_t vni)
     if (!checkDelImet(key, vni))
         return;
 
-    SWSS_LOG_NOTICE("IMET Del route key:%s vtep:%s %s", key.c_str(), inet_ntoa(vtep), vlan_id.c_str());
+	SWSS_LOG_NOTICE("%sIMET Del route key:%s vtep:%s %s", 
+			m_AppRestartAssist->isWarmStartInProgress() ? "WARM-RESTART:" : "", 
+			key.c_str(), inet_ntoa(vtep), vlan_id.c_str());
 
     std::vector<FieldValueTuple> fvVector;
     FieldValueTuple f("vni", to_string(vni));
     fvVector.push_back(f);
 
-#if 0
     // If warmstart is in progress, we take all netlink changes into the cache map
     if (m_AppRestartAssist->isWarmStartInProgress())
     {
         m_AppRestartAssist->insertToMap(APP_EVPN_REMOTE_VNI_TABLE_NAME, key, fvVector, true);
         return;
     }
-#endif
-    m_imetTable.del(key);
+    
+	m_imetTable.del(key);
     return;
 }
 
@@ -361,15 +355,18 @@ void FdbSync::macUpdateVxlanDB(string key)
     fvVector.push_back(t);
     fvVector.push_back(v);
 
-#if 0
+	SWSS_LOG_NOTICE("%sVXLAN_FDB_TABLE: ADD_KEY %s vtep:%s type:%s", 
+			m_AppRestartAssist->isWarmStartInProgress() ? "WARM-RESTART:" : "" ,
+			key.c_str(), vtep.c_str(), type.c_str());
+
     // If warmstart is in progress, we take all netlink changes into the cache map
     if (m_AppRestartAssist->isWarmStartInProgress())
     {
         m_AppRestartAssist->insertToMap(APP_VXLAN_FDB_TABLE_NAME, key, fvVector, false);
         return;
     }
-#endif
-    SWSS_LOG_NOTICE("VXLAN_FDB_TABLE: ADD_KEY %s vtep:%s type:%s", key.c_str(), vtep.c_str(), type.c_str());
+    
+	SWSS_LOG_NOTICE("VXLAN_FDB_TABLE: ADD_KEY %s vtep:%s type:%s", key.c_str(), vtep.c_str(), type.c_str());
     m_fdbTable.set(key, fvVector);
 }
 
@@ -392,15 +389,18 @@ void FdbSync::macDelVxlanDB(string key)
     fvVector.push_back(t);
     fvVector.push_back(v);
 
-#if 0
+	SWSS_LOG_NOTICE("%sVXLAN_FDB_TABLE: DEL_KEY %s vtep:%s type:%s", 
+			m_AppRestartAssist->isWarmStartInProgress() ? "WARM-RESTART:" : "" ,            
+			key.c_str(), vtep.c_str(), type.c_str());
+
     // If warmstart is in progress, we take all netlink changes into the cache map
     if (m_AppRestartAssist->isWarmStartInProgress())
     {
         m_AppRestartAssist->insertToMap(APP_VXLAN_FDB_TABLE_NAME, key, fvVector, true);
         return;
     }
-#endif
-    SWSS_LOG_NOTICE("VXLAN_FDB_TABLE: DEL_KEY %s vtep:%s type:%s", key.c_str(), vtep.c_str(), type.c_str());
+    
+	SWSS_LOG_NOTICE("VXLAN_FDB_TABLE: DEL_KEY %s vtep:%s type:%s", key.c_str(), vtep.c_str(), type.c_str());
     m_fdbTable.del(key);
     return;
 

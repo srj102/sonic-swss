@@ -9,15 +9,8 @@
 #include "netmsg.h"
 #include "warmRestartAssist.h"
 
-// The timeout value (in seconds) for neighsyncd reconcilation logic
-//#define DEFAULT_FDBSYNC_WARMSTART_TIMER 5
-
-/*
- * This is the timer value (in seconds) that the neighsyncd waits for restore_neighbors
- * service to finish, should be longer than the restore_neighbors timeout value (110)
- * This should not happen, if happens, system is in a unknown state, we should exit.
- */
-//#define RESTORE_FDB_WAIT_TIME_OUT 120
+// The timeout value (in seconds) for fdbsyncd reconcilation logic
+#define DEFAULT_FDBSYNC_WARMSTART_TIMER 30
 
 namespace swss {
 
@@ -36,8 +29,8 @@ struct fdb_info
     char mac[32];
     unsigned int vid;
     char port_name[32];
-    short type;/*dynamic or static*/
-    short op_type;/*add or del*/
+    short type;					/*dynamic or static*/
+    short op_type;				/*add or del*/
 };
 
 class FdbSync : public NetMsg
@@ -45,34 +38,33 @@ class FdbSync : public NetMsg
 public:
     enum { MAX_ADDR_SIZE = 64 };
 
-    FdbSync(RedisPipeline *pipelineAppDB, DBConnector *stateDb/*, DBConnector *config_db*/);
+    FdbSync(RedisPipeline *pipelineAppDB, DBConnector *stateDb);
     ~FdbSync();
 
     virtual void onMsg(int nlmsg_type, struct nl_object *obj);
 
     bool isFdbRestoreDone();
-#if 0
-    AppRestartAssist *getRestartAssist()
+    
+	AppRestartAssist *getRestartAssist()
     {
         return m_AppRestartAssist;
     }
-#endif
-    SubscriberStateTable *getFdbStateTable()
+    
+	SubscriberStateTable *getFdbStateTable()
     {
         return &m_fdbStateTable;
     }
 
     void processStateFdb();
 
-    //void processCfgVxlanMap();
-
+    bool m_reconcileDone = false;
 
 private:
-    //Table m_stateFdbRestoreTable;
+    Table m_stateFdbRestoreTable;
     ProducerStateTable m_fdbTable;
     ProducerStateTable m_imetTable;
     SubscriberStateTable m_fdbStateTable;
-    //AppRestartAssist  *m_AppRestartAssist;
+    AppRestartAssist  *m_AppRestartAssist;
 
     struct fdbmacinfo
     {

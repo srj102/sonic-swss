@@ -22,7 +22,7 @@ int main(int argc, char **argv)
     DBConnector stateDb(STATE_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
     DBConnector log_db(LOGLEVEL_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
 
-    FdbSync sync(&pipelineAppDB, &stateDb/*, &config_db*/);
+    FdbSync sync(&pipelineAppDB, &stateDb);
     g_fdbsync = &sync;
 
     NetDispatcher::getInstance().registerMessageHandler(RTM_NEWNEIGH, &sync);
@@ -37,6 +37,16 @@ int main(int argc, char **argv)
             Select s;
 
             using namespace std::chrono;
+
+            /*
+             * If WarmStart is enabled, restore the VXLAN-FDB and VNI 
+             * tables and start a reconcillation timer
+             */
+            if (sync.getRestartAssist()->isWarmStartInProgress())
+            {
+                sync.getRestartAssist()->readTablesToMap();                
+                SWSS_LOG_NOTICE("Starting ReconcileTimer");
+            }
 
             netlink.registerGroup(RTNLGRP_LINK);
             netlink.registerGroup(RTNLGRP_NEIGH);
@@ -61,6 +71,16 @@ int main(int argc, char **argv)
                      * If warmstart is in progress, we check the reconcile timer,
                      * if timer expired, we stop the timer and start the reconcile process
                      */
+					if (sync.getRestartAssist()->isWarmStartInProgress())
+					{
+						if (sync.getRestartAssist()->checkReconcileTimer(temps))
+						{
+							sync.m_reconcileDone = true;
+							sync.getRestartAssist()->stopReconcileTimer(s);
+							sync.getRestartAssist()->reconcile();
+							SWSS_LOG_NOTICE("VXLAN FDB VNI Reconcillation Complete (Timer)");
+						}
+					}
                 }                
             }
         }
