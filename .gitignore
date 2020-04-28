@@ -56,6 +56,7 @@ cfgmgr/nbrmgrd
 cfgmgr/vxlanmgrd
 cfgmgr/natmgrd
 neighsyncd/neighsyncd
+fdbsyncd/fdbsyncd
 portsyncd/portsyncd
 natsyncd/natsyncd
 orchagent/orchagent
