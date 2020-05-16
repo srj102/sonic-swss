@@ -12,10 +12,8 @@
 #include "netmsg.h"
 #include "macaddress.h"
 #include "exec.h"
-#include "shellcmd.h"
 #include "fdbsync.h"
 #include "warm_restart.h"
-#include "errno.h"
 
 using namespace std;
 using namespace swss;
