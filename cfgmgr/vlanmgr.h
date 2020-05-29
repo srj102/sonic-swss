@@ -15,16 +15,18 @@ namespace swss {
 class VlanMgr : public Orch
 {
 public:
-    VlanMgr(DBConnector *cfgDb, DBConnector *appDb, DBConnector *stateDb, const std::vector<std::string> &tableNames);
+    VlanMgr(DBConnector *cfgDb, DBConnector *appDb, DBConnector *stateDb, const vector<string> &cfgTableNames, const vector<string> &stateTableNames);
     using Orch::doTask;
 
 private:
     ProducerStateTable m_appVlanTableProducer, m_appVlanMemberTableProducer;
     ProducerStateTable m_appFdbTableProducer;
     ProducerStateTable m_appSwitchTableProducer;
-    Table m_cfgVlanTable, m_cfgVlanMemberTable;
+    ProducerStateTable m_appVlanSuppressTableProducer;
+    Table m_cfgVlanTable, m_cfgVlanMemberTable, m_cfgVlanSuppressTable;
     Table m_statePortTable, m_stateLagTable;
     Table m_stateVlanTable, m_stateVlanMemberTable;
+    Table m_stateTunnelVlanMapTable;
     std::set<std::string> m_vlans;
     NotificationConsumer* m_VlanStateNotificationConsumer;
 
@@ -34,6 +36,8 @@ private:
     void doVlanMemberTask(Consumer &consumer);
     void doFdbTask(Consumer &consumer);
     void doSwitchTask(Consumer &consumer);
+    void doNeighSuppressTask(Consumer &consumer);
+    void doVlanTunnelMapUpdateTask(Consumer &consumer);
     void processUntaggedVlanMembers(std::string vlan, const std::string &members);
 
     bool addHostVlan(int vlan_id);

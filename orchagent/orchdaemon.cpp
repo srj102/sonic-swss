@@ -77,11 +77,12 @@ bool OrchDaemon::init()
     const int portsorch_base_pri = 40;
 
     vector<table_name_with_pri_t> ports_tables = {
-        { APP_PORT_TABLE_NAME,        portsorch_base_pri + 5 },
-        { APP_VLAN_TABLE_NAME,        portsorch_base_pri + 2 },
-        { APP_VLAN_MEMBER_TABLE_NAME, portsorch_base_pri     },
-        { APP_LAG_TABLE_NAME,         portsorch_base_pri + 4 },
-        { APP_LAG_MEMBER_TABLE_NAME,  portsorch_base_pri     }
+        { APP_PORT_TABLE_NAME,                  portsorch_base_pri + 5 },
+        { APP_VLAN_TABLE_NAME,                  portsorch_base_pri + 2 },
+        { APP_VLAN_MEMBER_TABLE_NAME,           portsorch_base_pri     },
+        { APP_LAG_TABLE_NAME,                   portsorch_base_pri + 4 },
+        { APP_LAG_MEMBER_TABLE_NAME,            portsorch_base_pri     },
+        { APP_NEIGH_SUPPRESS_VLAN_TABLE_NAME,   portsorch_base_pri     },
     };
 
     vector<table_name_with_pri_t> app_fdb_tables = {

@@ -1640,6 +1640,7 @@ bool PortsOrch::bake()
     addExistingData(APP_LAG_MEMBER_TABLE_NAME);
     addExistingData(APP_VLAN_TABLE_NAME);
     addExistingData(APP_VLAN_MEMBER_TABLE_NAME);
+    addExistingData(APP_NEIGH_SUPPRESS_VLAN_TABLE_NAME);
 
     return true;
 }
@@ -2724,6 +2725,10 @@ void PortsOrch::doTask(Consumer &consumer)
         else if (table_name == APP_VLAN_MEMBER_TABLE_NAME)
         {
             doVlanMemberTask(consumer);
+        }
+        else if (table_name == APP_NEIGH_SUPPRESS_VLAN_TABLE_NAME)
+        {
+            doVlanSuppressTask(consumer);
         }
         else if (table_name == APP_LAG_TABLE_NAME)
         {
@@ -4174,6 +4179,83 @@ bool PortsOrch::updateL3VniStatus(uint16_t vlan_id, bool isUp)
 
     SWSS_LOG_NOTICE("Updated L3Vni status of VLAN %d member count %d", vlan_id, vlan.m_up_member_count);
 
+    return true;
+}
+
+void PortsOrch::doVlanSuppressTask(Consumer &consumer)
+{
+    SWSS_LOG_ENTER();
+    SWSS_LOG_INFO("Vlan Suppress task called ");
+
+    auto it = consumer.m_toSync.begin();
+    while (it != consumer.m_toSync.end())
+    {
+        auto &t = it->second;
+        bool rv;
+
+        string vlan_alias = kfvKey(t);
+
+        /* Ensure the key starts with "Vlan" otherwise ignore */
+        if (strncmp(vlan_alias.c_str(), VLAN_PREFIX, 4))
+        {
+            SWSS_LOG_ERROR("Invalid key format. No 'Vlan' prefix: %s", vlan_alias.c_str());
+            it = consumer.m_toSync.erase(it);
+            continue;
+        }
+
+        string op = kfvOp(t);
+        if (op == SET_COMMAND)
+        {
+            rv = updateVlanNeighSuppress(vlan_alias, true);
+            if (!rv) {
+                it++;
+                continue;
+            }
+        }
+        else if (op == DEL_COMMAND)
+        {
+            updateVlanNeighSuppress(vlan_alias, false);
+        }
+        else
+        {
+            SWSS_LOG_ERROR("Unknown operation type %s", op.c_str());
+        }
+
+        it = consumer.m_toSync.erase(it);
+
+    }
+
+}
+
+bool PortsOrch::updateVlanNeighSuppress(string vlan_alias, bool status)
+{
+#if SAI_VLAN_SUPPRESS_SUPPORTED
+    Port vlan;
+    sai_attribute_t attr;
+
+    SWSS_LOG_NOTICE("Update VlanNeighSuppress for Vlan %s with Op %s",
+            vlan_alias.c_str(), status?"SET":"DEL");
+
+    if (!getPort(vlan_alias, vlan))
+    {
+        SWSS_LOG_INFO("Failed to locate VLAN %s", vlan_alias.c_str());
+        return false;
+    }
+
+    attr.id = SAI_VLAN_ATTR_NEIGH_SUPPRESS_ENABLE;
+    attr.value.booldata = status;
+
+    sai_status_t sai_status = sai_vlan_api->set_vlan_attribute(vlan.m_vlan_info.vlan_oid, &attr);
+
+    if (sai_status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("Failed to update NeighSuppress VLAN %s ", vlan_alias.c_str());
+        return true;
+    }
+
+    vlan.m_neigh_suppress = status;
+    SWSS_LOG_NOTICE("Updated neigh suppression status of VLAN %s", vlan_alias.c_str());
+#endif
     return true;
 }
 

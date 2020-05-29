@@ -7,6 +7,9 @@
 #include "tokenize.h"
 #include "shellcmd.h"
 #include "warm_restart.h"
+#if NLAPI_SUPPORTED
+#include "nlapi.h"
+#endif
 
 using namespace std;
 using namespace swss;
@@ -22,18 +25,22 @@ using namespace swss;
 
 extern MacAddress gMacAddress;
 
-VlanMgr::VlanMgr(DBConnector *cfgDb, DBConnector *appDb, DBConnector *stateDb, const vector<string> &tableNames) :
-        Orch(cfgDb, tableNames),
+VlanMgr::VlanMgr(DBConnector *cfgDb, DBConnector *appDb, DBConnector *stateDb, const vector<string> &cfgTableNames, 
+                 const vector<string> &stateTableNames) :
+        Orch(cfgDb, stateDb, cfgTableNames,stateTableNames),
         m_cfgVlanTable(cfgDb, CFG_VLAN_TABLE_NAME),
         m_cfgVlanMemberTable(cfgDb, CFG_VLAN_MEMBER_TABLE_NAME),
+        m_cfgVlanSuppressTable(cfgDb, CFG_NEIGH_SUPPRESS_VLAN_TABLE_NAME),
         m_statePortTable(stateDb, STATE_PORT_TABLE_NAME),
         m_stateLagTable(stateDb, STATE_LAG_TABLE_NAME),
         m_stateVlanTable(stateDb, STATE_VLAN_TABLE_NAME),
         m_stateVlanMemberTable(stateDb, STATE_VLAN_MEMBER_TABLE_NAME),
+        m_stateTunnelVlanMapTable(stateDb, STATE_NEIGH_SUPPRESS_VLAN_TABLE_NAME),
         m_appFdbTableProducer(appDb, APP_FDB_TABLE_NAME),
         m_appSwitchTableProducer(appDb, APP_SWITCH_TABLE_NAME),
         m_appVlanTableProducer(appDb, APP_VLAN_TABLE_NAME),
-        m_appVlanMemberTableProducer(appDb, APP_VLAN_MEMBER_TABLE_NAME)
+        m_appVlanMemberTableProducer(appDb, APP_VLAN_MEMBER_TABLE_NAME),
+        m_appVlanSuppressTableProducer(appDb, APP_NEIGH_SUPPRESS_VLAN_TABLE_NAME)
 {
     SWSS_LOG_ENTER();
 
@@ -754,6 +761,16 @@ void VlanMgr::doTask(Consumer &consumer)
         SWSS_LOG_DEBUG("Table:SWITCH");
         doSwitchTask(consumer);
     }
+    else if (table_name == CFG_NEIGH_SUPPRESS_VLAN_TABLE_NAME)
+    {
+        SWSS_LOG_DEBUG("CfgTable:NeighSuppress");
+        doNeighSuppressTask(consumer);
+    }
+    else if (table_name == STATE_NEIGH_SUPPRESS_VLAN_TABLE_NAME)
+    {
+        SWSS_LOG_DEBUG("StateTable:Tunnel Name for NeighSuppress");
+        doVlanTunnelMapUpdateTask(consumer);
+    }
     else
     {
         SWSS_LOG_ERROR("Unknown config table %s ", table_name.c_str());
@@ -789,3 +806,342 @@ void VlanMgr::doTask(NotificationConsumer &consumer)
         SWSS_LOG_ERROR("received state update for vlan %s not existing", data.c_str());
     }
 }
+
+void VlanMgr::doNeighSuppressTask(Consumer &consumer)
+{
+    int status;
+    int ret;
+
+    if (!isVlanMacOk())
+    {
+        SWSS_LOG_DEBUG("VLAN mac not ready, delaying VLAN task");
+        return;
+    }
+    auto it = consumer.m_toSync.begin();
+
+    while (it != consumer.m_toSync.end())
+    {
+        auto &t = it->second;
+
+        string key = kfvKey(t);
+
+        /* Ensure the key starts with "Vlan" otherwise ignore */
+        if (strncmp(key.c_str(), VLAN_PREFIX, 4))
+        {
+            SWSS_LOG_ERROR("Invalid key format. No 'Vlan' prefix: %s", key.c_str());
+            it = consumer.m_toSync.erase(it);
+            continue;
+        }
+
+        if (m_vlans.find(key) != m_vlans.end())
+        {
+            SWSS_LOG_DEBUG("%s is created before suppress ", key.c_str()); 
+        }
+        else
+        {
+            SWSS_LOG_DEBUG("%s is not yet created when suppress is set", key.c_str()); 
+        }
+
+        int vlan_id;
+        try
+        {
+            vlan_id = stoi(key.substr(4));
+        }
+        catch (...)
+        {
+            SWSS_LOG_ERROR("Invalid key format. Not a number after 'Vlan' prefix: %s", key.c_str());
+            it = consumer.m_toSync.erase(it);
+            continue;
+        }
+
+
+        string op = kfvOp(t);
+        SWSS_LOG_DEBUG("Suppress OP %s for Vlan %d ", op.c_str(),vlan_id);
+
+        std::string netdev_str;
+        //Find the netdev name if its created before config.
+        m_stateTunnelVlanMapTable.hget(key.c_str(), "netdev", netdev_str);
+
+        if (op == SET_COMMAND)
+        {
+            string suppress;
+            vector<FieldValueTuple> fvVector;
+
+            for (auto i : kfvFieldsValues(t))
+            {
+
+                if (fvField(i) == "suppress")
+                {
+                    suppress = fvValue(i);
+                }
+            }
+
+            if(suppress != "on")
+            {
+                SWSS_LOG_ERROR("Invalid Suppress value supplied - %s", suppress.c_str());
+
+                if(suppress == "off")
+                    SWSS_LOG_ERROR("Del cmd required to disable Suppress ");
+
+                it = consumer.m_toSync.erase(it);
+                continue;
+            }
+
+            FieldValueTuple s("suppress", suppress);
+            fvVector.push_back(s);
+
+            m_appVlanSuppressTableProducer.set(key, fvVector);
+
+            //Update the NetDev Flag, if its created;
+            if(netdev_str != "")
+            {
+                SWSS_LOG_INFO("Ifname is %s !!!\n", netdev_str.c_str());
+                status = nlapi_req_bridge_link_set_neigh_suppress(netdev_str.c_str(),"on");
+
+                SWSS_LOG_DEBUG("SetSuppress %s status => %d", (dumpTuple(consumer, t)).c_str(),status);
+                //When the suppress & tunnel map config is given together at run time.
+                //Each handler's redis-get of other event will return netdev, resulting in double add.
+                //So check the m_vlanTunnelMapCache before adding ebtable.
+                if(m_vlanTunnelMapCache[key] == "")
+                {
+                    m_vlanTunnelMapCache[key] = netdev_str;
+
+                    if(arp_user_ebtable)
+                    {
+                        std::string arp_user_ebcmds = std::string("")
+                            + BASH_CMD + " -c \""
+                            + "ebtables -I ARP_USER_LIST -o "
+                            + netdev_str.c_str()
+                            + " -j ACCEPT\"";
+
+                        std::string res;
+                        ret = swss::exec(arp_user_ebcmds , res);
+                        if(ret != 0)
+                        {
+                            SWSS_LOG_INFO("vlanmgrd failed in inserting vtep rule in arp user ebtable.");
+                        }
+                        else
+                        {
+                            SWSS_LOG_INFO("vlanmgrd inserted vtep rule(%s) in arp user ebtable.",
+                                    netdev_str.c_str());
+                        }
+                    }
+                }
+            }
+
+        }
+        else if (op == DEL_COMMAND)
+        {
+            m_appVlanSuppressTableProducer.del(key);
+
+            if(netdev_str != "")
+            {
+                SWSS_LOG_INFO("Ifname is %s !!!\n", netdev_str.c_str());
+                status = nlapi_req_bridge_link_set_neigh_suppress(netdev_str.c_str(),"off");
+
+                SWSS_LOG_DEBUG("DelSuppress %s status => %d", (dumpTuple(consumer, t)).c_str(),status);
+                //Erase the Map as we delete ebtbl 
+                if(m_vlanTunnelMapCache[key] != "")
+                {
+                    m_vlanTunnelMapCache.erase(key);
+                }
+
+                if(arp_user_ebtable)
+                {
+                    std::string arp_user_ebcmds = std::string("")
+                        + BASH_CMD + " -c \""
+                        + "ebtables -D ARP_USER_LIST -o "
+                        + netdev_str.c_str()
+                        + " -j ACCEPT\"";
+
+                    std::string res;
+                    ret = swss::exec(arp_user_ebcmds , res);
+                    if(ret != 0)
+                    {
+                        SWSS_LOG_INFO("vlanmgrd failed in deleting vtep rule in arp user ebtable.");
+                    }
+                    else
+                    {
+                        SWSS_LOG_INFO("vlanmgrd deleted vtep rule(%s) in arp user ebtable.",
+                                netdev_str.c_str());
+                    }
+                }
+            }
+        }
+        else
+        {
+            SWSS_LOG_ERROR("Unknown operation type %s", op.c_str());
+            SWSS_LOG_DEBUG("Suppress %s", (dumpTuple(consumer, t)).c_str());
+            it = consumer.m_toSync.erase(it);
+            continue;
+        }
+
+        //Scan for the Vlan Untagged Member.
+        //Update the ARP User EB if Untag Member exist
+        updateUntaggedVlanMembersInArpEbTable(key.c_str(), (op == SET_COMMAND) ? true : false);
+
+        it = consumer.m_toSync.erase(it);
+    }
+}
+
+void VlanMgr::doVlanTunnelMapUpdateTask(Consumer &consumer)
+{
+    int status;
+    int ret;
+
+    if (!isVlanMacOk())
+    {
+        SWSS_LOG_DEBUG("VLAN mac not ready, delaying VLAN task");
+        return;
+    }
+    auto it = consumer.m_toSync.begin();
+
+    while (it != consumer.m_toSync.end())
+    {
+        auto &t = it->second;
+
+        string key = kfvKey(t);
+
+        /* Ensure the key starts with "Vlan" otherwise ignore */
+        if (strncmp(key.c_str(), VLAN_PREFIX, 4))
+        {
+            SWSS_LOG_ERROR("Invalid key format. No 'Vlan' prefix: %s", key.c_str());
+            it = consumer.m_toSync.erase(it);
+            continue;
+        }
+
+        if (m_vlans.find(key) != m_vlans.end())
+        {
+            SWSS_LOG_DEBUG("Tunnel Update for %s ", key.c_str());
+        }
+        else
+        {
+            SWSS_LOG_DEBUG("Tunnel Update comes before %s Creation", key.c_str()); 
+        }
+
+        int vlan_id;
+        try
+        {
+            vlan_id = stoi(key.substr(4));
+        }
+        catch (...)
+        {
+            SWSS_LOG_ERROR("Invalid key format. Not a number after 'Vlan' prefix: %s", key.c_str());
+            it = consumer.m_toSync.erase(it);
+            continue;
+        }
+
+
+        string op = kfvOp(t);
+        SWSS_LOG_DEBUG("OP %s - Tunnel netdev mapped Vlan %d", op.c_str(),vlan_id);
+        std::string netdev_str;
+
+
+        if (op == SET_COMMAND)
+        {
+            vector<FieldValueTuple> fvVector;
+            string suppress_str = "";
+
+            for (auto i : kfvFieldsValues(t))
+            {
+                if (fvField(i) == "netdev")
+                {
+                    netdev_str = fvValue(i);
+                }
+            }
+
+            //Update the NetDev Flag, if Suppress is set in config;
+            SWSS_LOG_INFO("Tunnel Ifname is %s !!!\n", netdev_str.c_str());
+
+            SWSS_LOG_NOTICE("Check the Neigh Suppress Status for %s \n",key.c_str());
+            m_cfgVlanSuppressTable.hget(key.c_str(), "suppress", suppress_str);
+
+            if(suppress_str != "")
+            {
+                SWSS_LOG_NOTICE("Suppress value is %s \n", suppress_str.c_str());
+                //Update the flags when feature is turned on before Netlink is created;
+                if(suppress_str == "on")
+                {
+                    //Call nlapi to modify the flags of netif;
+                    SWSS_LOG_NOTICE("Modifying Flags of NetIf %s \n",netdev_str.c_str());
+                    //Call NLAPI to turn on the flag to suppress Arp & ND requests.
+                    status = nlapi_req_bridge_link_set_neigh_suppress(netdev_str.c_str(),"on");
+
+                    SWSS_LOG_DEBUG("Arp & ND Suppress is on for %s status => %d", (dumpTuple(consumer, t)).c_str(),status);
+
+                    //When the suppress & tunnel map config is given together at run time.
+                    //Each handler's redis-get of other event will return netdev, resulting in double add.
+                    //So check the m_vlanTunnelMapCache before adding ebtable.
+                    //m_vlanTunnelMapCache is also required during delete tunnel event as only key is supplied in Del operation.
+                    if(m_vlanTunnelMapCache[key] == "")
+                    {
+                        m_vlanTunnelMapCache[key] = netdev_str;
+
+                        if(arp_user_ebtable)
+                        {
+                            std::string arp_user_ebcmds = std::string("")
+                                + BASH_CMD + " -c \""
+                                + "ebtables -I ARP_USER_LIST -o "
+                                + netdev_str.c_str()
+                                + " -j ACCEPT\"";
+
+                            std::string res;
+                            ret = swss::exec(arp_user_ebcmds , res);
+                            if(ret != 0)
+                            {
+                                SWSS_LOG_INFO("vlanmgrd failed in inserting vtep rule in arp user ebtable.");
+                            }
+                            else
+                            {
+                                SWSS_LOG_INFO("vlanmgrd inserted vtep rule(%s) in arp user ebtable.",
+                                        netdev_str.c_str());
+                            }
+                        }
+                    }
+
+                }
+            }
+
+        }
+        else if (op == DEL_COMMAND)
+        {
+            SWSS_LOG_DEBUG("Tunnel is removed from Vlan %s ", key.c_str());
+            SWSS_LOG_INFO("NetDev => %s ", m_vlanTunnelMapCache[key].c_str());
+
+            if(m_vlanTunnelMapCache[key] != "")
+            {
+                netdev_str = m_vlanTunnelMapCache[key];
+                m_vlanTunnelMapCache.erase(key);
+
+                if(arp_user_ebtable)
+                {
+                    std::string arp_user_ebcmds = std::string("")
+                        + BASH_CMD + " -c \""
+                        + "ebtables -D ARP_USER_LIST -o "
+                        + netdev_str.c_str()
+                        + " -j ACCEPT\"";
+
+                    std::string res;
+                    ret = swss::exec(arp_user_ebcmds , res);
+                    if(ret != 0)
+                    {
+                        SWSS_LOG_INFO("vlanmgrd failed in deleting vtep rule in arp user ebtable.");
+                    }
+                    else
+                    {
+                        SWSS_LOG_INFO("vlanmgrd deleted vtep rule(%s) in arp user ebtable.",
+                                netdev_str.c_str());
+                    }
+                }
+            }
+
+        }
+        else
+        {
+            SWSS_LOG_ERROR("Unknown operation type %s", op.c_str());
+            SWSS_LOG_DEBUG("Suppress %s", (dumpTuple(consumer, t)).c_str());
+        }
+        it = consumer.m_toSync.erase(it);
+    }
+}
+

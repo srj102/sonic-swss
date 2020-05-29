@@ -160,6 +160,7 @@ private:
     void doPortTask(Consumer &consumer);
     void doVlanTask(Consumer &consumer);
     void doVlanMemberTask(Consumer &consumer);
+    void doVlanSuppressTask(Consumer &consumer);
     void doLagTask(Consumer &consumer);
     void doLagMemberTask(Consumer &consumer);
 
@@ -238,6 +239,7 @@ private:
 
     bool setPortSerdesAttribute(sai_object_id_t port_id, sai_attr_id_t attr_id,
                                 vector<uint32_t> &serdes_val);
+    bool updateVlanNeighSuppress(string vlan, bool status);
     friend class VxlanTunnelOrch;
     friend class EvpnRemoteVniOrch;
     void updateLagOperStatus(Port &port, sai_port_oper_status_t status);

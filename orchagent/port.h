@@ -77,6 +77,7 @@ public:
     std::string         m_learn_mode = "hardware";
     bool                m_autoneg = false;
     bool                m_admin_state_up = false;
+    bool                m_neigh_suppress = false; // Used when Port class is of type Vlan;
     bool                m_l3_vni = false;
     sai_object_id_t     m_port_id = 0;
     sai_port_fec_mode_t m_fec_mode = SAI_PORT_FEC_MODE_NONE;
