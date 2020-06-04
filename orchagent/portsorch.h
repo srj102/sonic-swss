@@ -225,7 +225,6 @@ private:
     bool addVlanMember(Port &vlan, Port &port, string& tagging_mode);
     bool removeVlanMember(Port &vlan, Port &port);
     bool isVlanMember(Port &vlan, Port &port);
-    uint32_t  getNumVlanMember(Port &port);
 
     bool addLag(string lag);
     bool removeLag(Port lag);

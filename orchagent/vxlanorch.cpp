@@ -15,6 +15,8 @@
 #include "vxlanorch.h"
 #include "directory.h"
 #include "swssnet.h"
+#include "warm_restart.h"
+#include "tokenize.h"
 
 /* Global variables */
 extern sai_object_id_t gSwitchId;
@@ -74,6 +76,31 @@ static inline uint32_t tunnel_map_val (MAP_T map_t)
 {
     return vxlanTunnelMapKeyVal.at(map_t).second;
 }
+
+static inline MAP_T tunnel_map_type (tunnel_map_type_t type, bool isencap)
+{
+    if(isencap)
+    {
+      switch(type)
+      {
+       case TUNNEL_MAP_T_VLAN : return MAP_T::VLAN_ID_TO_VNI;
+       case TUNNEL_MAP_T_VIRTUAL_ROUTER: return MAP_T::VRID_TO_VNI;
+       case TUNNEL_MAP_T_BRIDGE: return MAP_T::BRIDGE_TO_VNI;
+       default: return MAP_T::MAP_TO_INVALID;
+      }
+    }
+    else
+    {
+      switch(type)
+      {
+       case TUNNEL_MAP_T_VLAN : return MAP_T::VNI_TO_VLAN_ID;
+       case TUNNEL_MAP_T_VIRTUAL_ROUTER: return MAP_T::VNI_TO_VRID;
+       case TUNNEL_MAP_T_BRIDGE: return MAP_T::VNI_TO_BRIDGE;
+       default: return MAP_T::MAP_TO_INVALID;
+      }
+    }
+}
+
 
 //------------------- SAI Interface functions --------------------------//
 
@@ -427,6 +454,32 @@ remove_tunnel_termination(sai_object_id_t term_table_id)
 }
 
 //------------------- VxlanTunnel Implementation --------------------------//
+
+VxlanTunnel::VxlanTunnel(string name, IpAddress srcIp, IpAddress dstIp, tunnel_creation_src_t src)
+                :tunnel_name_(name), src_ip_(srcIp), dst_ip_(dstIp), src_creation_(src)
+{
+   VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
+
+   if(dstIp.isZero())
+   {
+     //tunnel_orch->addVTEP(std::unique_ptr<VxlanTunnel>this,srcIp);
+     tunnel_orch->addVTEP(this,srcIp);
+     vtep_ptr = NULL;
+   }
+   else
+   {
+     vtep_ptr = tunnel_orch->getVTEP(srcIp);
+     tunnel_orch->addRemoveStateTableEntry(name,srcIp, dstIp,
+                                           src, true);
+   }
+}
+
+VxlanTunnel::~VxlanTunnel()
+{
+   VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
+   tunnel_orch->addRemoveStateTableEntry(tunnel_name_,src_ip_, dst_ip_,
+                                          src_creation_, false);
+}
 
 bool VxlanTunnel::createTunnel(MAP_T encap, MAP_T decap, uint8_t encap_ttl)
 {
@@ -811,7 +864,7 @@ bool VxlanTunnel::deleteTunnelHW(uint8_t mapper_list,
       ret = sai_tunnel_api->remove_tunnel(ids_.tunnel_id);
       SWSS_LOG_INFO("tunnel table delete reststatus = %d",ret);
       deleteMapperHW(mapper_list, map_src);
-      total_diptunnel_del++;
+      //total_diptunnel_del++;
     }
 
     catch (const std::runtime_error& error)
@@ -843,7 +896,7 @@ bool VxlanTunnel::createTunnelHW(uint8_t mapper_list,
         {
             swss::copy(ipd, dst_ip_);
             ip = &ipd;
-            total_diptunnel_add++;
+            //total_diptunnel_add++;
         }
 
         ids_.tunnel_id = create_tunnel(&ids_, &ips, ip, gUnderlayIfId);
@@ -1038,7 +1091,7 @@ bool VxlanTunnel::createDynamicDIPTunnel(const std::string dip, tunnel_user_type
 
        TUNNELMAP_SET_VLAN(mapper_list);
        TUNNELMAP_SET_VRF(mapper_list);
-       dip_tunnel->createTunnelHW(mapper_list,USE_COMMON_ENCAP_DECAP, FALSE);
+       dip_tunnel->createTunnelHW(mapper_list,USE_COMMON_ENCAP_DECAP, false);
        SWSS_LOG_NOTICE("Created P2P Tunnel remote IP %s ", dip.c_str());
     }
     else 
@@ -1094,7 +1147,7 @@ bool VxlanTunnel::deleteDynamicDIPTunnel(const std::string dip, tunnel_user_type
 
        TUNNELMAP_SET_VLAN(mapper_list);
        TUNNELMAP_SET_VRF(mapper_list);
-       dip_tunnel->deleteTunnelHW(mapper_list,USE_COMMON_ENCAP_DECAP, FALSE);
+       dip_tunnel->deleteTunnelHW(mapper_list,USE_COMMON_ENCAP_DECAP, false);
 
        tnl_users_.erase(dip);
 
@@ -1341,7 +1394,7 @@ bool VxlanTunnelOrch::addOperation(const Request& request)
         return true;
     }
 
-    vxlan_tunnel_table_[tunnel_name] = std::unique_ptr<VxlanTunnel>(new VxlanTunnel(tunnel_name, src_ip, dst_ip), TNL_CREATION_SRC_CLI);
+    vxlan_tunnel_table_[tunnel_name] = std::unique_ptr<VxlanTunnel>(new VxlanTunnel(tunnel_name, src_ip, dst_ip, TNL_CREATION_SRC_CLI));
 
     SWSS_LOG_NOTICE("Vxlan tunnel '%s' was added", tunnel_name.c_str());
     return true;
@@ -1569,16 +1622,17 @@ void VxlanTunnelOrch::addRemoveStateTableEntry(string tunnel_name,
 
 {
     std::vector<FieldValueTuple> fvVector, tmpFvVector;
-    WarmStart::WarmStartState state;
+    //WarmStart::WarmStartState state;
 
-    WarmStart::getWarmStartState("orchagent",state);
+    //WarmStart::getWarmStartState("orchagent",state);
 
     if(add)
     {
       // Add tunnel entry only for non-warmboot case or WB with new tunnel coming up
       // during WB
-      if ( (state != WarmStart::INITIALIZED) || 
-           !m_stateVxlanTable.get(tunnel_name, tmpFvVector))
+      //if ( (state != WarmStart::INITIALIZED) || 
+      //     !m_stateVxlanTable.get(tunnel_name, tmpFvVector))
+      if(1)
       {
         fvVector.emplace_back("src_ip", (sip.to_string()).c_str());
         fvVector.emplace_back("dst_ip", (dip.to_string()).c_str());
@@ -1701,12 +1755,15 @@ bool VxlanTunnelMapOrch::addOperation(const Request& request)
     }
 
     tunnel_orch->addVlanMappedToVni(vni_id, vlan_id);
+
+#ifdef L3PR 
     VRFOrch* vrf_orch = gDirectory.get<VRFOrch*>();
     if (0 == vrf_orch->getL3VniVlan(vni_id))
     {
         SWSS_LOG_NOTICE("update l3vni %d, vlan %d", vni_id, vlan_id);
         vrf_orch->updateL3VniVlan(vni_id, vlan_id);
     }
+#endif
 
     SWSS_LOG_NOTICE("Vxlan tunnel map entry '%s' for tunnel '%s' was created",
                    tunnel_map_entry_name.c_str(), tunnel_name.c_str());
@@ -1739,7 +1796,7 @@ bool VxlanTunnelMapOrch::delOperation(const Request& request)
 
     vlanPort.m_vnid = (uint32_t) 0xFFFFFFFF;
 
-    auto tunnel_map_entry_id = vxlan_tunnel_map_table_[full_tunnel_map_entry_name];
+    auto tunnel_map_entry_id = vxlan_tunnel_map_table_[full_tunnel_map_entry_name].map_entry_id;
     try
     {
         remove_tunnel_map_entry(tunnel_map_entry_id);
@@ -1933,8 +1990,11 @@ bool VxlanVrfMapOrch::delOperation(const Request& request)
         return false;
     }
 
+#ifdef L3PR
     SWSS_LOG_NOTICE("VxlanVrfMapOrch Vxlan vrf map entry '%s' is removed. VRF Refcnt %d", full_map_entry_name.c_str(),
             vrf_orch->getVrfRefCount(vrf_name));
+#endif
+
     return true;
 }
 

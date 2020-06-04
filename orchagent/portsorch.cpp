@@ -3752,18 +3752,6 @@ bool PortsOrch::isVlanMember(Port &vlan, Port &port)
     return true;
 }
 
-uint32_t  PortsOrch::getNumVlanMember(Port &port)
-{
-    uint32_t num;
-
-    if(m_portVlanMember.find(port.m_alias) == m_portVlanMember.end())
-      return 0;
-
-    num =(uint32_t) (m_portVlanMember[port.m_alias].size());
-
-    return num;
-}
-
 bool PortsOrch::addLag(string lag_alias)
 {
     SWSS_LOG_ENTER();
@@ -4023,7 +4011,7 @@ bool PortsOrch::addTunnel(string tunnel_alias, sai_object_id_t tunnel_id, bool h
     else
       tunnel.m_learn_mode = "disable";
     m_portList[tunnel_alias] = tunnel;
-    portOidToName[tunnel_id] = tunnel_alias;
+    //portOidToName[tunnel_id] = tunnel_alias;
 
     SWSS_LOG_WARN("addTunnel:: 0x%lx",tunnel_id);
 
@@ -4034,7 +4022,7 @@ bool PortsOrch::removeTunnel(Port tunnel)
 {
     SWSS_LOG_ENTER();
 
-    portOidToName.erase(tunnel.m_tunnel_id);
+    //portOidToName.erase(tunnel.m_tunnel_id);
     m_portList.erase(tunnel.m_alias);
 
     return true;
