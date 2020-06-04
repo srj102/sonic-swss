@@ -80,7 +80,7 @@ private:
     */
     bool isVrfStateOk(const std::string & vrfName);
     bool isVxlanStateOk(const std::string & vxlanName);
-    bool isVlanStateOk(const string &vlanName);
+    bool isVlanStateOk(const std::string &vlanName);
     std::pair<bool, std::string> getVxlanRouterMacAddress();
 
     bool createVxlan(const VxlanInfo & info);
@@ -112,7 +112,7 @@ private:
 
     DBConnector *m_app_db;
     bool m_in_reconcile;
-    vector<std::string> m_appVxlanTunnelMapKeysRecon;
+    std::vector<std::string> m_appVxlanTunnelMapKeysRecon;
     std::map<std::string, std::string> m_vxlanNetDevices;
 };
 

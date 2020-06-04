@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <algorithm>
 #include <regex>
 #include <sstream>
@@ -16,6 +17,8 @@
 using namespace std;
 using namespace swss;
 
+extern MacAddress gMacAddress;
+
 // Fields name
 #define VXLAN_TUNNEL "vxlan_tunnel"
 #define SOURCE_IP "src_ip"
@@ -29,6 +32,10 @@ using namespace swss;
 
 #define VXLAN_NAME_PREFIX "Vxlan"
 #define VXLAN_IF_NAME_PREFIX "Brvxlan"
+
+#define VLAN "vlan"
+#define DST_IP "dst_ip"
+#define SOURCE_VTEP "source_vtep"
 
 static std::string getVxlanName(const swss::VxlanMgr::VxlanInfo & info)
 {
@@ -170,13 +177,13 @@ VxlanMgr::VxlanMgr(DBConnector *cfgDb, DBConnector *appDb, DBConnector *stateDb,
         m_appVxlanTunnelTable(appDb, APP_VXLAN_TUNNEL_TABLE_NAME),
         m_appVxlanTunnelMapTable(appDb, APP_VXLAN_TUNNEL_MAP_TABLE_NAME),
         m_appSwitchTable(appDb, APP_SWITCH_TABLE_NAME),
-        m_appEvpnNvoTable(appDb, APP_EVPN_NVO_TABLE_NAME),
+        m_appEvpnNvoTable(appDb, APP_VXLAN_EVPN_NVO_TABLE_NAME),
         m_cfgVxlanTunnelTable(cfgDb, CFG_VXLAN_TUNNEL_TABLE_NAME),
         m_cfgVnetTable(cfgDb, CFG_VNET_TABLE_NAME),
         m_stateVrfTable(stateDb, STATE_VRF_TABLE_NAME),
         m_stateVxlanTable(stateDb, STATE_VXLAN_TABLE_NAME),
         m_stateVlanTable(stateDb, STATE_VLAN_TABLE_NAME),
-        m_stateTunnelVlanMapTable(stateDb, STATE_TUNNEL_VLAN_MAP_TABLE_NAME),
+        m_stateTunnelVlanMapTable(stateDb, STATE_NEIGH_SUPPRESS_VLAN_TABLE_NAME),
         m_stateVxlanTunnelTable(stateDb, STATE_VXLAN_TUNNEL_TABLE_NAME)
 {
    getAllVxlanNetDevices();
@@ -327,10 +334,10 @@ bool VxlanMgr::doVxlanCreateTask(const KeyOpFieldsValuesTuple & t)
     info.m_macAddress = macAddress.second;
 
     auto sourceIp = std::find_if(
-        it->second.begin(),
-        it->second.end(),
+        it->second.fvt.begin(),
+        it->second.fvt.end(),
         [](const FieldValueTuple & fvt){ return fvt.first == SOURCE_IP; });
-    if (sourceIp  != it->second.end())
+    if (sourceIp  != it->second.fvt.end())
     {
         info.m_sourceIp = sourceIp->second;
     }
@@ -1022,7 +1029,7 @@ int VxlanMgr::deleteVxlanNetdevice(std::string vxlan_dev_name)
     int ret = 0;
     std::string res;
     const std::string cmd = std::string("") + IP_CMD " link del dev " + vxlan_dev_name;
-    EXECUTE(cmd, res);
+    EXEC_WITH_ERROR_THROW(cmd, res);
     return ret;
 }
 
