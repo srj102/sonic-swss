@@ -1758,15 +1758,6 @@ bool VxlanTunnelMapOrch::addOperation(const Request& request)
 
     tunnel_orch->addVlanMappedToVni(vni_id, vlan_id);
 
-#ifdef L3PR 
-    VRFOrch* vrf_orch = gDirectory.get<VRFOrch*>();
-    if (0 == vrf_orch->getL3VniVlan(vni_id))
-    {
-        SWSS_LOG_NOTICE("update l3vni %d, vlan %d", vni_id, vlan_id);
-        vrf_orch->updateL3VniVlan(vni_id, vlan_id);
-    }
-#endif
-
     SWSS_LOG_NOTICE("Vxlan tunnel map entry '%s' for tunnel '%s' was created",
                    tunnel_map_entry_name.c_str(), tunnel_name.c_str());
 
@@ -1991,11 +1982,6 @@ bool VxlanVrfMapOrch::delOperation(const Request& request)
             full_map_entry_name.c_str(), error.what());
         return false;
     }
-
-#ifdef L3PR
-    SWSS_LOG_NOTICE("VxlanVrfMapOrch Vxlan vrf map entry '%s' is removed. VRF Refcnt %d", full_map_entry_name.c_str(),
-            vrf_orch->getVrfRefCount(vrf_name));
-#endif
 
     return true;
 }
