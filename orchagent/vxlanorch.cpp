@@ -259,6 +259,7 @@ create_tunnel(
     sai_ip_address_t *src_ip,
     sai_ip_address_t *dst_ip,
     sai_object_id_t underlay_rif,
+    bool p2p,
     sai_uint8_t encap_ttl=0)
 {
     sai_attribute_t attr;
@@ -317,12 +318,11 @@ create_tunnel(
     }
 
     // dest ip
-    if (dst_ip != nullptr)
+    if ((dst_ip != nullptr) && p2p)
     {
         attr.id = SAI_TUNNEL_ATTR_PEER_MODE;
         attr.value.s32 = SAI_TUNNEL_PEER_MODE_P2P;
         tunnel_attrs.push_back(attr);
-
         attr.id = SAI_TUNNEL_ATTR_ENCAP_DST_IP;
         attr.value.ipaddr = *dst_ip;
         tunnel_attrs.push_back(attr);
@@ -466,7 +466,7 @@ VxlanTunnel::VxlanTunnel(string name, IpAddress srcIp, IpAddress dstIp, tunnel_c
      tunnel_orch->addVTEP(this,srcIp);
      vtep_ptr = NULL;
    }
-   else
+   else if(src_creation_ == TNL_CREATION_SRC_EVPN) 
    {
      vtep_ptr = tunnel_orch->getVTEP(srcIp);
      tunnel_orch->addRemoveStateTableEntry(name,srcIp, dstIp,
@@ -503,7 +503,7 @@ bool VxlanTunnel::createTunnel(MAP_T encap, MAP_T decap, uint8_t encap_ttl)
         if (encap != MAP_T::MAP_TO_INVALID)
             ip = &ips;
 
-        ids_.tunnel_id = create_tunnel(&ids_, ip, NULL, gUnderlayIfId, encap_ttl);
+        ids_.tunnel_id = create_tunnel(&ids_, ip, NULL, gUnderlayIfId, false, encap_ttl);
 
         ip = nullptr;
         if (!dst_ip_.isZero())
@@ -884,6 +884,8 @@ bool VxlanTunnel::deleteTunnelHW(uint8_t mapper_list,
 bool VxlanTunnel::createTunnelHW(uint8_t mapper_list, 
                                  tunnel_map_src_t map_src, bool with_term)
 {
+    bool p2p = false;
+
     try
     {
         sai_ip_address_t ips, ipd, *ip=nullptr;
@@ -896,10 +898,12 @@ bool VxlanTunnel::createTunnelHW(uint8_t mapper_list,
         {
             swss::copy(ipd, dst_ip_);
             ip = &ipd;
+            p2p = (src_creation_ == TNL_CREATION_SRC_EVPN)? true:false;
+            SWSS_LOG_WARN("creation src = %d",src_creation_);
             //total_diptunnel_add++;
         }
 
-        ids_.tunnel_id = create_tunnel(&ids_, &ips, ip, gUnderlayIfId);
+        ids_.tunnel_id = create_tunnel(&ids_, &ips, ip, gUnderlayIfId, p2p);
 
         if(with_term)
           ids_.tunnel_term_id = create_tunnel_termination(ids_.tunnel_id, ips, ip, gVirtualRouterId);
@@ -1385,7 +1389,6 @@ bool VxlanTunnelOrch::addOperation(const Request& request)
             return true;
 	}
     }
-
     const auto& tunnel_name = request.getKeyString(0);
 
     if(isTunnelExists(tunnel_name))
@@ -1721,7 +1724,6 @@ bool VxlanTunnelMapOrch::addOperation(const Request& request)
 
     if (!tunnel_obj->isActive())
     {
-
         //@Todo, currently only decap mapper is allowed
         //tunnel_obj->createTunnel(MAP_T::MAP_TO_INVALID, MAP_T::VNI_TO_VLAN_ID);
         uint8_t mapper_list = 0;
