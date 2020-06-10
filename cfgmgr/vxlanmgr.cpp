@@ -411,48 +411,10 @@ bool VxlanMgr::doVxlanTunnelCreateTask(const KeyOpFieldsValuesTuple & t)
     tuncache.vlan_vni_refcnt = 0;
     tuncache.m_sourceIp = fvValue(tuncache.fvt.back());
     
-    if(tuncache.fvt.size() == 2)
-    {
-      // NULL,NULL src_ip,<a.b.c.d>
-      // This is for the openconfig set src_ip case
-      std::vector<FieldValueTuple> fvt;
-
-      fvt = tuncache.fvt;
-      fvt.erase(fvt.begin());
-      SWSS_LOG_NOTICE("openconfig set SIP case. fvt size = %lu field =%s value=%s", 
-                       fvt.size(), fvField(tuncache.fvt.back()).c_str(), 
-                       fvValue(tuncache.fvt.back()).c_str());
-
-      m_appVxlanTunnelTable.set(vxlanTunnelName, fvt);
-    }
-    else
-    {
-      if(fvField(tuncache.fvt.back()) == "NULL")
-      {
-        if(m_vxlanTunnelCache.find(vxlanTunnelName) == m_vxlanTunnelCache.end())
-        {
-           // NULL,NULL openconfig interface create 
-           SWSS_LOG_NOTICE("openconfig interface create");
-        }
-        else
-        {
-           // NULL,NULL openconfig src_ip delete
-           m_appVxlanTunnelTable.del(vxlanTunnelName);
-           SWSS_LOG_NOTICE("openconfig sip unset");
-        }
-      }
-      else
-      {
-         // src_ip,<a.b.c.d> click create 
-         // openconfig combined interface+sip set
-         m_appVxlanTunnelTable.set(vxlanTunnelName, kfvFieldsValues(t));
-         SWSS_LOG_NOTICE("openconfig combined or click set");
-      }
-    }
-      
+    m_appVxlanTunnelTable.set(vxlanTunnelName, kfvFieldsValues(t));
     m_vxlanTunnelCache[vxlanTunnelName] = tuncache;;
 
-    SWSS_LOG_INFO("Create vxlan tunnel %s", vxlanTunnelName.c_str());
+    SWSS_LOG_NOTICE("Create vxlan tunnel %s", vxlanTunnelName.c_str());
     return true;
 }
 
@@ -467,14 +429,14 @@ bool VxlanMgr::doVxlanTunnelDeleteTask(const KeyOpFieldsValuesTuple & t)
 
     if((it != m_EvpnNvoCache.end()) && (it->second == vxlanTunnelName))
     {
-       SWSS_LOG_INFO("Tunnel %s deletion failed. Need to delete NVO", vxlanTunnelName.c_str());
+       SWSS_LOG_WARN("Tunnel %s deletion failed. Need to delete NVO", vxlanTunnelName.c_str());
        return false;
     }
       
     // If there are mappings still against this tunnel then hold on.
     if(m_vxlanTunnelCache[vxlanTunnelName].vlan_vni_refcnt)
     {
-      SWSS_LOG_INFO("Tunnel %s deletion failed. Need to delete mapping entries",
+      SWSS_LOG_WARN("Tunnel %s deletion failed. Need to delete mapping entries",
                     vxlanTunnelName.c_str());
       return false;
     }
@@ -490,7 +452,7 @@ bool VxlanMgr::doVxlanTunnelDeleteTask(const KeyOpFieldsValuesTuple & t)
         m_vxlanTunnelCache.erase(it1);
     }
 
-    SWSS_LOG_INFO("Delete vxlan tunnel %s", vxlanTunnelName.c_str());
+    SWSS_LOG_NOTICE("Delete vxlan tunnel %s", vxlanTunnelName.c_str());
     return true;
 }
 
@@ -507,8 +469,7 @@ bool VxlanMgr::doVxlanTunnelMapCreateTask(const KeyOpFieldsValuesTuple & t)
       return true;
     }
 
-    SWSS_LOG_INFO("Create vxlan tunnel map %s", vxlanTunnelMapName.c_str());
-    /*Create vxlan tunnel in Linux kernel, the foramt is vxlanTunnelName-vni, such as VTTNL0001-1000*/
+    SWSS_LOG_NOTICE("Create vxlan tunnel map %s", vxlanTunnelMapName.c_str());
     std::string vlan, vlan_id, vni_id, src_ip, dst_ip("");
     for (auto i : kfvFieldsValues(t))
     {
@@ -959,23 +920,26 @@ void VxlanMgr::delAppDBTunnelMapTable(std::string vxlanTunnelMapName)
 }
 
 int VxlanMgr::createVxlanNetdevice(std::string vxlanTunnelName, std::string vni_id, 
-                                   std::string src_ip, std::string dst_ip, std::string vlan_id)  
+                                   std::string src_ip, std::string dst_ip, 
+                                   std::string vlan_id)
 {
     int ret = 0;
-
-    //ip link add <vxlan_dev_name> type vxlan id <vni> local <src_ip> remote <dst_ip> dstport 4789
-    //ip link set <vxlan_dev_name> master DOT1Q_BRIDGE_NAME
-    //bridge vlan add vid <vlan_id> dev <vxlan_dev_name>
-    //ip link set <vxlan_dev_name> up
+    std::string res, chkcmd, cmds;
+    std::string link_add_cmd, link_set_master_cmd, link_up_cmd; 
+    std::string bridge_add_cmd, bridge_untagged_add_cmd, bridge_del_vid_cmd;
     std::string vxlan_dev_name;
-    vxlan_dev_name = std::string("") + std::string(vxlanTunnelName) + "-" + std::string(vlan_id);
+
+    vxlan_dev_name = std::string("") + std::string(vxlanTunnelName) + "-" + 
+                     std::string(vlan_id);
 
     SWSS_LOG_NOTICE("Kernel tnl_name: %s vni_id: %s src_ip: %s dst_ip:%s vlan_id: %s",
-                vxlanTunnelName.c_str(), vni_id.c_str(), src_ip.c_str(), dst_ip.c_str(), vlan_id.c_str());
-    /* Case 1: Entry exist - Erase from cache & return
-     * Case 2: Enry does not exist - Create netDevice in Kernel
-     * Case 3: Entry exist but modified - Not taken care. Will address later
-     */
+                    vxlanTunnelName.c_str(), vni_id.c_str(), src_ip.c_str(), dst_ip.c_str(), 
+                    vlan_id.c_str());
+
+    // Case 1: Entry exist - Erase from cache & return
+    // Case 2: Enry does not exist - Create netDevice in Kernel
+    // Case 3: Entry exist but modified - Not taken care. Will address later
+     
     if (true == m_in_reconcile)
     { 
         auto it = m_vxlanNetDevices.find(vxlan_dev_name);
@@ -997,7 +961,7 @@ int VxlanMgr::createVxlanNetdevice(std::string vxlanTunnelName, std::string vni_
         SWSS_LOG_NOTICE("Creating VxlanNetDevice %s", vxlan_dev_name.c_str());
     }
 
-    std::string res, chkcmd, cmds;
+    // Remove kernel device if it exists
     chkcmd = "ip link show " + vxlan_dev_name;
     ret = swss::exec(chkcmd,res);
     if(ret == 0)
@@ -1005,9 +969,11 @@ int VxlanMgr::createVxlanNetdevice(std::string vxlanTunnelName, std::string vni_
         cmds = "ip link del dev " + vxlan_dev_name ;
         EXEC_WITH_ERROR_THROW(cmds, res);
     }
+
+#if 0
     cmds = std::string("")
         + BASH_CMD + " -c \""
-        + IP_CMD + " link add " + vxlan_dev_name + " type vxlan id " + std::string(vni_id) + " address " + gMacAddress.to_string()
+        + IP_CMD + " link add " + vxlan_dev_name + " type vxlan id " + std::string(vni_id) + 
         + " local " + src_ip + ((dst_ip  == "")? "":(" remote " + dst_ip)) + " nolearning " +" dstport 4789 " + " && "
         + IP_CMD + " link set " + vxlan_dev_name + " master Bridge " 
         + " && "
@@ -1015,11 +981,49 @@ int VxlanMgr::createVxlanNetdevice(std::string vxlanTunnelName, std::string vni_
         + " && "
         + BRIDGE_CMD + " vlan add vid " + std::string(vlan_id) + " untagged pvid dev " + vxlan_dev_name 
         + " && ";
+#endif
+
+    // ip link add <vxlan_dev_name> type vxlan id <vni> local <src_ip> remote <dst_ip> 
+    // dstport 4789
+    // ip link set <vxlan_dev_name> master DOT1Q_BRIDGE_NAME
+    // bridge vlan add vid <vlan_id> dev <vxlan_dev_name>
+    // bridge vlan add vid <vlan_id> untagged pvid dev <vxlan_dev_name>
+    // ip link set <vxlan_dev_name> up
+
+    link_add_cmd = std::string("") + IP_CMD + " link add " + vxlan_dev_name + 
+                   " address " + gMacAddress.to_string() + " type vxlan id " + 
+                   std::string(vni_id) + " local " + src_ip + 
+                   ((dst_ip  == "")? "":(" remote " + dst_ip)) + 
+                   " nolearning " + " dstport 4789 ";
+    
+    link_set_master_cmd = std::string("") + IP_CMD + " link set " + 
+                          vxlan_dev_name + " master Bridge ";
+
+    link_up_cmd = std::string("") + IP_CMD + " link set " + vxlan_dev_name + " up ";
+
+    bridge_add_cmd = std::string("") + BRIDGE_CMD + " vlan add vid " + 
+                     std::string(vlan_id) + " dev " + vxlan_dev_name;
+
+    bridge_untagged_add_cmd = std::string("") + BRIDGE_CMD + " vlan add vid " + 
+                              std::string(vlan_id) + " untagged pvid dev " + vxlan_dev_name;
+
+    bridge_del_vid_cmd = std::string("") + BRIDGE_CMD + " vlan del vid 1 dev " + 
+                         vxlan_dev_name;
+    
+    
+    cmds = std::string("") + BASH_CMD + " -c \"" + 
+           link_add_cmd + " && " + 
+           link_set_master_cmd + " && " + 
+           bridge_add_cmd + " && " + 
+           bridge_untagged_add_cmd + " && "; 
+        
     if( vlan_id != "1")
     {
-        cmds = cmds + BRIDGE_CMD + " vlan del vid 1 dev " + vxlan_dev_name + " && ";
+        cmds += bridge_del_vid_cmd + " && ";
     }
-    cmds = cmds + IP_CMD + " link set " + vxlan_dev_name + " up " + "\"";
+
+    cmds += link_up_cmd + "\"";
+
     EXEC_WITH_ERROR_THROW(cmds, res);
     return ret;
 }
@@ -1028,7 +1032,7 @@ int VxlanMgr::deleteVxlanNetdevice(std::string vxlan_dev_name)
 {    
     int ret = 0;
     std::string res;
-    const std::string cmd = std::string("") + IP_CMD " link del dev " + vxlan_dev_name;
+    const std::string cmd = std::string("") + IP_CMD  + " link del dev " + vxlan_dev_name;
     EXEC_WITH_ERROR_THROW(cmd, res);
     return ret;
 }
