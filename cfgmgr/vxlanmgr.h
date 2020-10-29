@@ -29,19 +29,19 @@ public:
         std::string m_macAddress;
     } VxlanInfo;
 
-    typedef struct TunCacheT
+    typedef struct TunCache
     {
         std::vector<FieldValueTuple> fvt;
         std::string m_sourceIp;
         uint32_t vlan_vni_refcnt;
-    } TunCacheT;
+    } TunCache;
 
-    typedef struct MapCacheT
+    typedef struct MapCache
     {
         std::string vxlan_dev_name;
         std::string vlan;
         std::string vni_id;
-    } MapCacheT;
+    } MapCache;
 
     void waitTillReadyToReconcile();
     void beginReconcile(bool warm);
@@ -97,8 +97,8 @@ private:
     * Key: tunnel name
     * Value: Field Value pairs of vxlan tunnel
     */
-    std::map<std::string, TunCacheT > m_vxlanTunnelCache;
-    std::map<std::string, MapCacheT> m_vxlanTunnelMapCache;
+    std::map<std::string, TunCache > m_vxlanTunnelCache;
+    std::map<std::string, MapCache> m_vxlanTunnelMapCache;
     std::map<std::string, std::string> m_vlanMapCache;
     std::map<std::string, std::string> m_vniMapCache;
     std::map<std::string, std::string> m_EvpnNvoCache;

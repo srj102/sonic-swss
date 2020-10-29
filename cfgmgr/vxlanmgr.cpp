@@ -186,13 +186,13 @@ VxlanMgr::VxlanMgr(DBConnector *cfgDb, DBConnector *appDb, DBConnector *stateDb,
         m_stateTunnelVlanMapTable(stateDb, STATE_NEIGH_SUPPRESS_VLAN_TABLE_NAME),
         m_stateVxlanTunnelTable(stateDb, STATE_VXLAN_TUNNEL_TABLE_NAME)
 {
-   getAllVxlanNetDevices();
+    getAllVxlanNetDevices();
 
-   if (!WarmStart::isWarmStart())
-   {
-      // Clear old vxlan devices that were created at last time.
-      clearAllVxlanDevices();
-   }
+    if (!WarmStart::isWarmStart())
+    {
+        // Clear old vxlan devices that were created at last time.
+        clearAllVxlanDevices();
+    }
 
 }
 
@@ -227,7 +227,7 @@ void VxlanMgr::doTask(Consumer &consumer)
             {
                 task_result = doVxlanTunnelMapCreateTask(t);
             }
-            else if(table_name == CFG_VXLAN_EVPN_NVO_TABLE_NAME)
+            else if (table_name == CFG_VXLAN_EVPN_NVO_TABLE_NAME)
             {
                 task_result = doVxlanEvpnNvoCreateTask(t);
             }
@@ -250,7 +250,7 @@ void VxlanMgr::doTask(Consumer &consumer)
             {
                 task_result = doVxlanTunnelMapDeleteTask(t);
             }
-            else if(table_name == CFG_VXLAN_EVPN_NVO_TABLE_NAME)
+            else if (table_name == CFG_VXLAN_EVPN_NVO_TABLE_NAME)
             {
                 task_result = doVxlanEvpnNvoDeleteTask(t);
             }
@@ -311,7 +311,7 @@ bool VxlanMgr::doVxlanCreateTask(const KeyOpFieldsValuesTuple & t)
     if (it == m_vxlanTunnelCache.end())
     {
         SWSS_LOG_DEBUG("Vxlan tunnel %s has not been created", info.m_vxlanTunnel.c_str());
-        // Suspend this message util the vxlan tunnel is created
+        // Suspend this message until the vxlan tunnel is created
         return false;
     }
 
@@ -319,7 +319,7 @@ bool VxlanMgr::doVxlanCreateTask(const KeyOpFieldsValuesTuple & t)
     if (!isVrfStateOk(info.m_vnet))
     {
         SWSS_LOG_DEBUG("Vrf %s has not been created", info.m_vnet.c_str());
-        // Suspend this message util the vrf is created
+        // Suspend this message until the vrf is created
         return false;
     }
     
@@ -328,7 +328,7 @@ bool VxlanMgr::doVxlanCreateTask(const KeyOpFieldsValuesTuple & t)
     if (!macAddress.first)
     {
         SWSS_LOG_DEBUG("Mac address is not ready");
-        // Suspend this message util the mac address is set
+        // Suspend this message until the mac address is set
         return false;
     }
     info.m_macAddress = macAddress.second;
@@ -395,7 +395,6 @@ bool VxlanMgr::doVxlanDeleteTask(const KeyOpFieldsValuesTuple & t)
     m_vnetCache.erase(it);
     SWSS_LOG_INFO("Delete vxlan %s", info.m_vxlan.c_str());
     return true;
-
 }
 
 bool VxlanMgr::doVxlanTunnelCreateTask(const KeyOpFieldsValuesTuple & t)
@@ -405,12 +404,22 @@ bool VxlanMgr::doVxlanTunnelCreateTask(const KeyOpFieldsValuesTuple & t)
     const std::string & vxlanTunnelName = kfvKey(t);
     
     // Update vxlan tunnel cache
-    TunCacheT tuncache;
+    TunCache tuncache;
 
     tuncache.fvt = kfvFieldsValues(t);
     tuncache.vlan_vni_refcnt = 0;
-    tuncache.m_sourceIp = fvValue(tuncache.fvt.back());
-    
+    tuncache.m_sourceIp = "NULL";
+
+    for (auto i : kfvFieldsValues(t))
+    {
+        const std::string & field = fvField(i);
+        const std::string & value = fvValue(i);
+        if (field == SOURCE_IP)
+        {
+            tuncache.m_sourceIp = value;
+        }
+    }
+
     m_appVxlanTunnelTable.set(vxlanTunnelName, kfvFieldsValues(t));
     m_vxlanTunnelCache[vxlanTunnelName] = tuncache;;
 
@@ -427,23 +436,22 @@ bool VxlanMgr::doVxlanTunnelDeleteTask(const KeyOpFieldsValuesTuple & t)
     // If there is an NVO referring to this tunnel then hold on.
     std::map<std::string, std::string>::iterator it = m_EvpnNvoCache.begin();
 
-    if((it != m_EvpnNvoCache.end()) && (it->second == vxlanTunnelName))
+    if ((it != m_EvpnNvoCache.end()) && (it->second == vxlanTunnelName))
     {
-       SWSS_LOG_WARN("Tunnel %s deletion failed. Need to delete NVO", vxlanTunnelName.c_str());
-       return false;
+        SWSS_LOG_WARN("Tunnel %s deletion failed. Need to delete NVO", vxlanTunnelName.c_str());
+        return false;
     }
       
     // If there are mappings still against this tunnel then hold on.
-    if(m_vxlanTunnelCache[vxlanTunnelName].vlan_vni_refcnt)
+    if (m_vxlanTunnelCache[vxlanTunnelName].vlan_vni_refcnt)
     {
-      SWSS_LOG_WARN("Tunnel %s deletion failed. Need to delete mapping entries",
-                    vxlanTunnelName.c_str());
-      return false;
+        SWSS_LOG_WARN("Tunnel %s deletion failed. Need to delete mapping entries", vxlanTunnelName.c_str());
+        return false;
     }
 
-    if(isTunnelActive(vxlanTunnelName))
+    if (isTunnelActive(vxlanTunnelName))
     {
-       m_appVxlanTunnelTable.del(vxlanTunnelName);
+        m_appVxlanTunnelTable.del(vxlanTunnelName);
     }
 
     auto it1 = m_vxlanTunnelCache.find(vxlanTunnelName);
@@ -463,10 +471,10 @@ bool VxlanMgr::doVxlanTunnelMapCreateTask(const KeyOpFieldsValuesTuple & t)
     std::string vxlanTunnelMapName = kfvKey(t);
     std::replace(vxlanTunnelMapName.begin(), vxlanTunnelMapName.end(), config_db_key_delimiter, delimiter);
 
-    if(m_vxlanTunnelMapCache.find(vxlanTunnelMapName) != m_vxlanTunnelMapCache.end())
+    if (m_vxlanTunnelMapCache.find(vxlanTunnelMapName) != m_vxlanTunnelMapCache.end())
     {
-      SWSS_LOG_ERROR("Map already present : %s", vxlanTunnelMapName.c_str());
-      return true;
+        SWSS_LOG_ERROR("Map already present : %s", vxlanTunnelMapName.c_str());
+        return true;
     }
 
     SWSS_LOG_NOTICE("Create vxlan tunnel map %s", vxlanTunnelMapName.c_str());
@@ -486,18 +494,18 @@ bool VxlanMgr::doVxlanTunnelMapCreateTask(const KeyOpFieldsValuesTuple & t)
     }
 
     // Check for VLAN or VNI if they are already mapped
-    if(m_vlanMapCache.find(vlan) != m_vlanMapCache.end())
+    if (m_vlanMapCache.find(vlan) != m_vlanMapCache.end())
     {
-      SWSS_LOG_ERROR("Vlan %s already mapped. Map Create failed for : %s", 
+        SWSS_LOG_ERROR("Vlan %s already mapped. Map Create failed for : %s", 
                       vlan.c_str(), vxlanTunnelMapName.c_str());
-      return true;
+        return true;
     }
 
-    if(m_vniMapCache.find(vni_id) != m_vniMapCache.end())
+    if (m_vniMapCache.find(vni_id) != m_vniMapCache.end())
     {
-      SWSS_LOG_ERROR("VNI %s already mapped. Map Create failed for : %s", 
+        SWSS_LOG_ERROR("VNI %s already mapped. Map Create failed for : %s", 
                       vni_id.c_str(), vxlanTunnelMapName.c_str());
-      return true;
+        return true;
     }
 
     const auto vlan_prefix = std::string("Vlan");
@@ -509,30 +517,35 @@ bool VxlanMgr::doVxlanTunnelMapCreateTask(const KeyOpFieldsValuesTuple & t)
 
     // If the vxlan tunnel has been created
     auto it = m_vxlanTunnelCache.find(vxlanTunnelName);
-    //if (it == m_vxlanTunnelCache.end() )
-    if(!isTunnelActive(vxlanTunnelName))
+    if (!isTunnelActive(vxlanTunnelName))
     {
         SWSS_LOG_INFO("Vxlan tunnel %s has not been created", vxlanTunnelName.c_str());
-        // Suspend this message util the vxlan tunnel is created
+        // Suspend this message until the vxlan tunnel is created
         return false;
     }
 
-    if(!isVlanStateOk(vlan))
+    if (!isVlanStateOk(vlan))
     {
-      SWSS_LOG_INFO("VLAN id is not yet created : %s",vxlanTunnelMapName.c_str());
-      return false;
+        SWSS_LOG_INFO("VLAN id is not yet created : %s",vxlanTunnelMapName.c_str());
+        return false;
     }
 
-    /* Check the below condition only after the vxlanmgrd has reached reconcile state */
+    // Check the below condition only after the vxlanmgrd has reached reconcile state
+    // The check to verify the state vxlan table is to take care of back to back 
+    // create and delete of a VTEP object. On deletion of a VTEP object the FRR takes 
+    // some time to remove all the routes and once all the routes are removed, the p2p 
+    // tunnel is also removed. This check waits for all the p2p tunnels which were associated
+    // with the earlier version of the VTEP to be deleted before processing further map entry 
+    // creations.
     WarmStart::WarmStartState state;
     WarmStart::getWarmStartState("vxlanmgrd",state);
     if (state == WarmStart::RECONCILED)
     {
-        if(m_vxlanTunnelMapCache.empty())
+        if (m_vxlanTunnelMapCache.empty())
         {
             std::vector<std::string> keys;
             m_stateVxlanTunnelTable.getKeys(keys);
-            if(!keys.empty())
+            if (!keys.empty())
             { 
                 SWSS_LOG_WARN("State VXLAN tunnel table not yet empty.");
                 return false;
@@ -572,7 +585,7 @@ bool VxlanMgr::doVxlanTunnelMapCreateTask(const KeyOpFieldsValuesTuple & t)
     std::string vxlan_dev_name;
     vxlan_dev_name = std::string("") + std::string(vxlanTunnelName) + "-" + std::string(vlan_id);
 
-    MapCacheT map_entry;
+    MapCache map_entry;
     map_entry.vxlan_dev_name = vxlan_dev_name;
     map_entry.vlan = vlan;
     map_entry.vni_id = vni_id;
@@ -608,17 +621,17 @@ bool VxlanMgr::doVxlanTunnelMapDeleteTask(const KeyOpFieldsValuesTuple & t)
     const auto vxlanTunnelName = vxlanTunnelMapName.substr(0, found);
 
     std::string vxlan_dev_name,vlan,vni_id;
-    MapCacheT map_entry;
+    MapCache map_entry;
 
     try
     {
-      map_entry = m_vxlanTunnelMapCache.at(vxlanTunnelMapName);
+        map_entry = m_vxlanTunnelMapCache.at(vxlanTunnelMapName);
     }
     catch (const std::out_of_range& oor)
     {
-      SWSS_LOG_ERROR("Error deleting tunnmap : %s exception : %s", 
+        SWSS_LOG_ERROR("Error deleting tunnmap : %s exception : %s", 
                       vxlanTunnelMapName.c_str(), oor.what());
-      return true;
+        return true;
     }
 
     vxlan_dev_name = map_entry.vxlan_dev_name;
@@ -646,25 +659,24 @@ bool VxlanMgr::doVxlanEvpnNvoCreateTask(const KeyOpFieldsValuesTuple & t)
 
     std::string EvpnNvoName = kfvKey(t);
 
-    if(m_EvpnNvoCache.find(EvpnNvoName) != m_EvpnNvoCache.end())
+    if (m_EvpnNvoCache.find(EvpnNvoName) != m_EvpnNvoCache.end())
     {
-      SWSS_LOG_ERROR("Only Single NVO object allowed");
-      return true;
+        SWSS_LOG_ERROR("Only Single NVO object allowed");
+        return true;
     }
     
     for (auto i : kfvFieldsValues(t))
     {
         const std::string & field = fvField(i);
         const std::string & value = fvValue(i);
-        //if(m_vxlanTunnelCache.find(value) == m_vxlanTunnelCache.end())
-        if(!isTunnelActive(value))
+        if (!isTunnelActive(value))
         {
-           SWSS_LOG_ERROR("NVO %s creation failed. VTEP not present",EvpnNvoName.c_str());
-           return false;
+            SWSS_LOG_ERROR("NVO %s creation failed. VTEP not present",EvpnNvoName.c_str());
+            return false;
         }
         if (field == SOURCE_VTEP)
         {
-           m_EvpnNvoCache[EvpnNvoName] = value;
+            m_EvpnNvoCache[EvpnNvoName] = value;
         }
     }
 
@@ -687,13 +699,15 @@ bool VxlanMgr::doVxlanEvpnNvoDeleteTask(const KeyOpFieldsValuesTuple & t)
     }
     catch (const std::out_of_range& oor)
     {
-      SWSS_LOG_ERROR("NVOdeletion NVO : %s not found exception : %s", EvpnNvoName.c_str(), oor.what());
-      return true;
+        SWSS_LOG_ERROR("NVOdeletion NVO : %s not found exception : %s", EvpnNvoName.c_str(), oor.what());
+        return true;
     }
 
      // If there are mappings still then the NVO cannot be deleted.
-    if(m_vxlanTunnelCache[vtep_name].vlan_vni_refcnt)
-      return false;
+    if (m_vxlanTunnelCache[vtep_name].vlan_vni_refcnt)
+    {
+        return false;
+    }
 
     m_EvpnNvoCache.erase(EvpnNvoName);
 
@@ -740,11 +754,11 @@ bool VxlanMgr::isVlanStateOk(const std::string &vlanName)
 
     if (!vlanName.compare(0, strlen(VLAN_PREFIX), VLAN_PREFIX))
     {
-      if (m_stateVlanTable.get(vlanName, temp))
-      {
-          SWSS_LOG_DEBUG("%s is ready", vlanName.c_str());
-          return true;
-      }
+        if (m_stateVlanTable.get(vlanName, temp))
+        {
+            SWSS_LOG_DEBUG("%s is ready", vlanName.c_str());
+            return true;
+        }
     }
     SWSS_LOG_INFO("%s is not ready", vlanName.c_str());
     return false;
@@ -889,7 +903,7 @@ void VxlanMgr::createAppDBTunnelMapTable(const KeyOpFieldsValuesTuple & t)
      * Case 2: Enry does not exist - Write to AppDB 
      * Case 3: Entry exist but modified - Not taken care. Will address later
      */
-    if (true == m_in_reconcile)
+    if (m_in_reconcile)
     { 
         auto it = find(m_appVxlanTunnelMapKeysRecon.begin(), m_appVxlanTunnelMapKeysRecon.end(), vxlanTunnelMapName);
         if (it != m_appVxlanTunnelMapKeysRecon.end())
@@ -924,7 +938,7 @@ int VxlanMgr::createVxlanNetdevice(std::string vxlanTunnelName, std::string vni_
                                    std::string vlan_id)
 {
     int ret = 0;
-    std::string res, chkcmd, cmds;
+    std::string res, cmds;
     std::string link_add_cmd, link_set_master_cmd, link_up_cmd; 
     std::string bridge_add_cmd, bridge_untagged_add_cmd, bridge_del_vid_cmd;
     std::string vxlan_dev_name;
@@ -940,7 +954,7 @@ int VxlanMgr::createVxlanNetdevice(std::string vxlanTunnelName, std::string vni_
     // Case 2: Enry does not exist - Create netDevice in Kernel
     // Case 3: Entry exist but modified - Not taken care. Will address later
      
-    if (true == m_in_reconcile)
+    if (m_in_reconcile)
     { 
         auto it = m_vxlanNetDevices.find(vxlan_dev_name);
         if (it != m_vxlanNetDevices.end())
@@ -960,28 +974,6 @@ int VxlanMgr::createVxlanNetdevice(std::string vxlanTunnelName, std::string vni_
     {
         SWSS_LOG_NOTICE("Creating VxlanNetDevice %s", vxlan_dev_name.c_str());
     }
-
-    // Remove kernel device if it exists
-    chkcmd = "ip link show " + vxlan_dev_name;
-    ret = swss::exec(chkcmd,res);
-    if(ret == 0)
-    {
-        cmds = "ip link del dev " + vxlan_dev_name ;
-        EXEC_WITH_ERROR_THROW(cmds, res);
-    }
-
-#if 0
-    cmds = std::string("")
-        + BASH_CMD + " -c \""
-        + IP_CMD + " link add " + vxlan_dev_name + " type vxlan id " + std::string(vni_id) + 
-        + " local " + src_ip + ((dst_ip  == "")? "":(" remote " + dst_ip)) + " nolearning " +" dstport 4789 " + " && "
-        + IP_CMD + " link set " + vxlan_dev_name + " master Bridge " 
-        + " && "
-        + BRIDGE_CMD + " vlan add vid " + std::string(vlan_id) + " dev " + vxlan_dev_name 
-        + " && "
-        + BRIDGE_CMD + " vlan add vid " + std::string(vlan_id) + " untagged pvid dev " + vxlan_dev_name 
-        + " && ";
-#endif
 
     // ip link add <vxlan_dev_name> type vxlan id <vni> local <src_ip> remote <dst_ip> 
     // dstport 4789
@@ -1017,7 +1009,7 @@ int VxlanMgr::createVxlanNetdevice(std::string vxlanTunnelName, std::string vni_
            bridge_add_cmd + " && " + 
            bridge_untagged_add_cmd + " && "; 
         
-    if( vlan_id != "1")
+    if ( vlan_id != "1")
     {
         cmds += bridge_del_vid_cmd + " && ";
     }
@@ -1157,7 +1149,7 @@ void VxlanMgr::clearAllVxlanDevices()
 
 void VxlanMgr::waitTillReadyToReconcile()
 {
-    for(;;)
+    for (;;)
     {
         WarmStart::WarmStartState state;
         WarmStart::getWarmStartState("vlanmgrd", state);
@@ -1212,10 +1204,14 @@ bool VxlanMgr::isTunnelActive(std::string vxlanTunnelName)
 {
     auto it = m_vxlanTunnelCache.find(vxlanTunnelName);
     if (it == m_vxlanTunnelCache.end())
-       return false;
+    {
+        return false;
+    }
 
-    if(m_vxlanTunnelCache[vxlanTunnelName].m_sourceIp == "NULL")
-      return false;
+    if (m_vxlanTunnelCache[vxlanTunnelName].m_sourceIp == "NULL")
+    {
+        return false;
+    }
 
     return true;
 }

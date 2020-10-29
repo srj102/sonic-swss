@@ -92,6 +92,8 @@ int main(int argc, char **argv)
 
         if (WarmStart::isWarmStart())
         {
+            WarmStart::WarmStartState state;
+
             vxlanmgr.waitTillReadyToReconcile();
             vxlanmgr.restoreVxlanNetDevices();
             WarmStart::setWarmStartState("vxlanmgrd", WarmStart::REPLAYED);
@@ -101,13 +103,14 @@ int main(int argc, char **argv)
             wb_tbl.hget("orchagent", "restore_count", val);
             if ((val != "") or (val != "0"))
             {
-                wb_tbl.hget("orchagent", "state", val);
-                while (val != "reconciled")
+                WarmStart::getWarmStartState("orchagent",state);
+                while (state != WarmStart::RECONCILED)
                 {
-                    SWSS_LOG_NOTICE("Waiting Until Orchagent is reconciled. Current %s. Waited %u secs", val.c_str(), wait_secs);
+                    SWSS_LOG_NOTICE("Waiting Until Orchagent is reconciled. Current %s. Waited %u secs", 
+                                     val.c_str(), wait_secs);
                     sleep(1);
                     wait_secs++;
-                    wb_tbl.hget("orchagent", "state", val);
+                    WarmStart::getWarmStartState("orchagent",state);
                 }
             }
         }
