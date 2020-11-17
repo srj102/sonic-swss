@@ -718,33 +718,6 @@ bool PortsOrch::removeSubPort(const string &alias)
     return true;
 }
 
-void PortsOrch::updateChildPortsMtu(const Port &p, const uint32_t mtu)
-{
-    if (p.m_type != Port::PHY && p.m_type != Port::LAG)
-    {
-        return;
-    }
-
-    for (const auto &child_port : p.m_child_ports)
-    {
-        Port subp;
-        if (!getPort(child_port, subp))
-        {
-            SWSS_LOG_WARN("Sub interface %s Port object not found", child_port.c_str());
-            continue;
-        }
-
-        subp.m_mtu = mtu;
-        m_portList[child_port] = subp;
-        SWSS_LOG_NOTICE("Sub interface %s inherits mtu change %u from parent port %s", child_port.c_str(), mtu, p.m_alias.c_str());
-
-        if (subp.m_rif_id)
-        {
-            gIntfsOrch->setRouterIntfsMtu(subp);
-        }
-    }
-}
-
 void PortsOrch::setPort(string alias, Port p)
 {
     m_portList[alias] = p;
@@ -1288,7 +1261,10 @@ bool PortsOrch::setPortPvid(Port &port, sai_uint32_t pvid)
     SWSS_LOG_ENTER();
 
     if(port.m_type == Port::TUNNEL)
-      return true;
+    {
+        SWSS_LOG_ERROR("pvid setting for tunnel %s is not allowed", port.m_alias.c_str());
+        return true;
+    }
 
     if (port.m_rif_id)
     {
@@ -1355,7 +1331,9 @@ bool PortsOrch::setHostIntfsStripTag(Port &port, sai_hostif_vlan_tag_t strip)
     vector<Port> portv;
 
     if(port.m_type == Port::TUNNEL)
-       return true;
+    {
+        return true;
+    }
 
     /*
      * Before SAI_HOSTIF_VLAN_TAG_ORIGINAL is supported by libsai from all asic vendors,
@@ -1728,9 +1706,9 @@ void PortsOrch::updateDbPortOperStatus(const Port& port, sai_port_oper_status_t 
 
     if(port.m_type == Port::TUNNEL)
     {
-      VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
-      tunnel_orch->updateDbTunnelOperStatus(port.m_alias, status);
-      return;
+        VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
+        tunnel_orch->updateDbTunnelOperStatus(port.m_alias, status);
+        return;
     }
 
     vector<FieldValueTuple> tuples;
@@ -1825,7 +1803,7 @@ bool PortsOrch::initPort(const string &alias, const int index, const set<int> &l
         /* Determine if the port has already been initialized before */
         if (m_portList.find(alias) != m_portList.end() && m_portList[alias].m_port_id == id)
         {
-            SWSS_LOG_DEBUG("Port has already been initialized before alias:%s", alias.c_str());
+            SWSS_LOG_INFO("Port has already been initialized before alias:%s", alias.c_str());
         }
         else
         {
@@ -1869,7 +1847,7 @@ bool PortsOrch::initPort(const string &alias, const int index, const set<int> &l
 
                 m_portList[alias].m_init = true;
 
-                SWSS_LOG_NOTICE("Initialized port %s", alias.c_str());
+                SWSS_LOG_ERROR("Initialized port %s", alias.c_str());
             }
             else
             {
@@ -2360,8 +2338,6 @@ void PortsOrch::doPortTask(Consumer &consumer)
                         {
                             gIntfsOrch->setRouterIntfsMtu(p);
                         }
-                        // Sub interfaces inherit parent physical port mtu
-                        updateChildPortsMtu(p, mtu);
                     }
                     else
                     {
@@ -2905,8 +2881,6 @@ void PortsOrch::doLagTask(Consumer &consumer)
                     {
                         gIntfsOrch->setRouterIntfsMtu(l);
                     }
-                    // Sub interfaces inherit parent LAG mtu
-                    updateChildPortsMtu(l, mtu);
                 }
 
                 if (!learn_mode.empty() && (l.m_learn_mode != learn_mode))
@@ -3368,37 +3342,37 @@ bool PortsOrch::addBridgePort(Port &port)
 
     if (port.m_type == Port::PHY)
     {
-      attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
-      attr.value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
-      attrs.push_back(attr);
+        attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
+        attr.value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
+        attrs.push_back(attr);
 
-      attr.id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
-      attr.value.oid = port.m_port_id;
-      attrs.push_back(attr);
+        attr.id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
+        attr.value.oid = port.m_port_id;
+        attrs.push_back(attr);
     }
     else if  (port.m_type == Port::LAG)
     {
-      attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
-      attr.value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
-      attrs.push_back(attr);
+        attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
+        attr.value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
+        attrs.push_back(attr);
 
-      attr.id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
-      attr.value.oid = port.m_lag_id;
-      attrs.push_back(attr);
+        attr.id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
+        attr.value.oid = port.m_lag_id;
+        attrs.push_back(attr);
     }
     else if  (port.m_type == Port::TUNNEL)
     {
-      attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
-      attr.value.s32 = SAI_BRIDGE_PORT_TYPE_TUNNEL;
-      attrs.push_back(attr);
+        attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
+        attr.value.s32 = SAI_BRIDGE_PORT_TYPE_TUNNEL;
+        attrs.push_back(attr);
 
-      attr.id = SAI_BRIDGE_PORT_ATTR_TUNNEL_ID;
-      attr.value.oid = port.m_tunnel_id;
-      attrs.push_back(attr);
+        attr.id = SAI_BRIDGE_PORT_ATTR_TUNNEL_ID;
+        attr.value.oid = port.m_tunnel_id;
+        attrs.push_back(attr);
 
-      attr.id = SAI_BRIDGE_PORT_ATTR_BRIDGE_ID;
-      attr.value.oid = m_default1QBridge;
-      attrs.push_back(attr);
+        attr.id = SAI_BRIDGE_PORT_ATTR_BRIDGE_ID;
+        attr.value.oid = m_default1QBridge;
+        attrs.push_back(attr);
     }
     else
     {
@@ -3406,29 +3380,6 @@ bool PortsOrch::addBridgePort(Port &port)
             port.m_alias.c_str(), port.m_type);
         return false;
     }
-
-#if 0
-    attr.id = SAI_BRIDGE_PORT_ATTR_TYPE;
-    attr.value.s32 = SAI_BRIDGE_PORT_TYPE_PORT;
-    attrs.push_back(attr);
-
-    attr.id = SAI_BRIDGE_PORT_ATTR_PORT_ID;
-    if (port.m_type == Port::PHY)
-    {
-        attr.value.oid = port.m_port_id;
-    }
-    else if  (port.m_type == Port::LAG)
-    {
-        attr.value.oid = port.m_lag_id;
-    }
-    else
-    {
-        SWSS_LOG_ERROR("Failed to add bridge port %s to default 1Q bridge, invalid porty type %d",
-            port.m_alias.c_str(), port.m_type);
-        return false;
-    }
-    attrs.push_back(attr);
-#endif
 
     /* Create a bridge port with admin status set to UP */
     attr.id = SAI_BRIDGE_PORT_ATTR_ADMIN_STATE;
@@ -4006,14 +3957,18 @@ bool PortsOrch::addTunnel(string tunnel_alias, sai_object_id_t tunnel_id, bool h
 
     Port tunnel(tunnel_alias, Port::TUNNEL);
     tunnel.m_tunnel_id = tunnel_id;
-    if(hwlearning)
-      tunnel.m_learn_mode = "hardware";
+    if (hwlearning)
+    {
+        tunnel.m_learn_mode = "hardware";
+    }
     else
-      tunnel.m_learn_mode = "disable";
+    {
+        tunnel.m_learn_mode = "disable";
+    }
     m_portList[tunnel_alias] = tunnel;
     //portOidToName[tunnel_id] = tunnel_alias;
 
-    SWSS_LOG_WARN("addTunnel:: 0x%lx",tunnel_id);
+    SWSS_LOG_INFO("addTunnel:: 0x%lx",tunnel_id);
 
     return true;
 }
@@ -4454,7 +4409,7 @@ bool PortsOrch::initGearboxPort(Port &port)
     {
         if (m_gearboxInterfaceMap.find(port.m_index) != m_gearboxInterfaceMap.end())
         {
-            SWSS_LOG_NOTICE("BOX: port_id:0x%" PRIx64 " index:%d alias:%s", port.m_port_id, port.m_index, port.m_alias.c_str());
+            SWSS_LOG_NOTICE("BOX: port_id:0x%lx index:%d alias:%s", port.m_port_id, port.m_index, port.m_alias.c_str());
 
             phy_id = m_gearboxInterfaceMap[port.m_index].phy_id;
             phyOidStr = m_gearboxPhyMap[phy_id].phy_oid;
@@ -4511,11 +4466,11 @@ bool PortsOrch::initGearboxPort(Port &port)
             status = sai_port_api->create_port(&systemPort, phyOid, static_cast<uint32_t>(attrs.size()), attrs.data());
             if (status != SAI_STATUS_SUCCESS)
             {
-                SWSS_LOG_ERROR("BOX: Failed to create Gearbox system-side port for alias:%s port_id:0x%" PRIx64 " index:%d status:%d",
+                SWSS_LOG_ERROR("BOX: Failed to create Gearbox system-side port for alias:%s port_id:0x%lx index:%d status:%d",
                         port.m_alias.c_str(), port.m_port_id, port.m_index, status);
                 return false;
             }
-            SWSS_LOG_NOTICE("BOX: Created Gearbox system-side port 0x%" PRIx64 " for alias:%s index:%d",
+            SWSS_LOG_NOTICE("BOX: Created Gearbox system-side port 0x%lx for alias:%s index:%d",
                     systemPort, port.m_alias.c_str(), port.m_index);
 
             /* Create LINE-SIDE port */
@@ -4594,11 +4549,11 @@ bool PortsOrch::initGearboxPort(Port &port)
             status = sai_port_api->create_port(&linePort, phyOid, static_cast<uint32_t>(attrs.size()), attrs.data());
             if (status != SAI_STATUS_SUCCESS)
             {
-                SWSS_LOG_ERROR("BOX: Failed to create Gearbox line-side port for alias:%s port_id:0x%" PRIx64 " index:%d status:%d",
+                SWSS_LOG_ERROR("BOX: Failed to create Gearbox line-side port for alias:%s port_id:0x%lx index:%d status:%d",
                    port.m_alias.c_str(), port.m_port_id, port.m_index, status);
                 return false;
             }
-            SWSS_LOG_NOTICE("BOX: Created Gearbox line-side port 0x%" PRIx64 " for alias:%s index:%d",
+            SWSS_LOG_NOTICE("BOX: Created Gearbox line-side port 0x%lx for alias:%s index:%d",
                 linePort, port.m_alias.c_str(), port.m_index);
 
             /* Connect SYSTEM-SIDE to LINE-SIDE */
@@ -4614,11 +4569,11 @@ bool PortsOrch::initGearboxPort(Port &port)
             status = sai_port_api->create_port_connector(&connector, phyOid, static_cast<uint32_t>(attrs.size()), attrs.data());
             if (status != SAI_STATUS_SUCCESS)
             {
-                SWSS_LOG_ERROR("BOX: Failed to connect Gearbox system-side:0x%" PRIx64 " to line-side:0x%" PRIx64 "; status:%d", systemPort, linePort, status);
+                SWSS_LOG_ERROR("BOX: Failed to connect Gearbox system-side:0x%lx to line-side:0x%lx; status:%d", systemPort, linePort, status);
                 return false;
             }
 
-            SWSS_LOG_NOTICE("BOX: Connected Gearbox ports; system-side:0x%" PRIx64 " to line-side:0x%" PRIx64, systemPort, linePort);
+            SWSS_LOG_NOTICE("BOX: Connected Gearbox ports; system-side:0x%lx to line-side:0x%lx", systemPort, linePort);
             m_gearboxPortListLaneMap[port.m_port_id] = make_tuple(systemPort, linePort);
         }
     }

@@ -37,17 +37,17 @@ typedef enum
 
 typedef enum
 {
-  TNL_CREATION_SRC_CLI,
-  TNL_CREATION_SRC_EVPN
+    TNL_CREATION_SRC_CLI,
+    TNL_CREATION_SRC_EVPN
 } tunnel_creation_src_t;
 
 typedef enum
 {
-   USE_COMMON_ENCAP_DECAP,
-   USE_COMMON_DECAP_DEDICATED_ENCAP,
-   USE_DECAP_ONLY,
-   USE_DEDICATED_ENCAP_DECAP
-} tunnel_map_src_t;
+    TUNNEL_MAP_USE_COMMON_ENCAP_DECAP,
+    TUNNEL_MAP_USE_COMMON_DECAP_DEDICATED_ENCAP,
+    TUNNEL_MAP_USE_DECAP_ONLY,
+    TUNNEL_MAP_USE_DEDICATED_ENCAP_DECAP
+} tunnel_map_use_t;
 
 struct tunnel_ids_t
 {
@@ -99,10 +99,10 @@ struct nh_tunnel_t
 };
 
 typedef enum {
-  TNL_SRC_IMR,
-  TNL_SRC_MAC,
-  TNL_SRC_IP
-} tunnel_user_type_e;
+    TUNNEL_USER_IMR,
+    TUNNEL_USER_MAC,
+    TUNNEL_USER_IP
+} tunnel_user_t;
 
 class VxlanTunnel;
 
@@ -180,14 +180,14 @@ public:
     void incNextHopRefCount(IpAddress& ipAddr, MacAddress macAddress, uint32_t vni);
     void decNextHopRefCount(IpAddress& ipAddr, MacAddress macAddress, uint32_t vni);
 
-    bool deleteMapperHW(uint8_t mapper_list, tunnel_map_src_t map_src);
-    bool createMapperHW(uint8_t mapper_list, tunnel_map_src_t map_src);
-    bool createTunnelHW(uint8_t mapper_list, tunnel_map_src_t map_src, bool with_term = true);
-    bool deleteTunnelHW(uint8_t mapper_list, tunnel_map_src_t map_src, bool with_term = true);
+    bool deleteMapperHw(uint8_t mapper_list, tunnel_map_use_t map_src);
+    bool createMapperHw(uint8_t mapper_list, tunnel_map_use_t map_src);
+    bool createTunnelHw(uint8_t mapper_list, tunnel_map_use_t map_src, bool with_term = true);
+    bool deleteTunnelHw(uint8_t mapper_list, tunnel_map_use_t map_src, bool with_term = true);
     void deletePendingSIPTunnel();
     void increment_spurious_imr_add(const std::string remote_vtep);
     void increment_spurious_imr_del(const std::string remote_vtep);
-    void updateDipTunnelRefCnt(bool , tunnel_refcnt_t& , tunnel_user_type_e );
+    void updateDipTunnelRefCnt(bool , tunnel_refcnt_t& , tunnel_user_t );
     // Total Routes using the DIP tunnel. 
     int getDipTunnelRefCnt(const std::string);
     int getDipTunnelIMRRefCnt(const std::string);
@@ -195,8 +195,8 @@ public:
     // Total DIP tunnels associated with this SIP tunnel.
     int getDipTunnelCnt();
     VxlanTunnel* getDipTunnel(const std::string dip);
-    bool createDynamicDIPTunnel(const string dip, tunnel_user_type_e usr);
-    bool deleteDynamicDIPTunnel(const string dip, tunnel_user_type_e usr, bool update_refcnt = true);
+    bool createDynamicDIPTunnel(const string dip, tunnel_user_t usr);
+    bool deleteDynamicDIPTunnel(const string dip, tunnel_user_t usr, bool update_refcnt = true);
     uint32_t vlan_vrf_vni_count = 0;
     bool del_tnl_hw_pending = false;
 
@@ -297,7 +297,7 @@ public:
 
     bool
     removeNextHopTunnel(string tunnelName, IpAddress& ipAddr, MacAddress macAddress, uint32_t vni=0);
-   std::string getTunnelPortName(const std::string& remote_vtep)
+    std::string getTunnelPortName(const std::string& remote_vtep)
     {
         std::string tunnelPortName = "Port_EVPN_" + remote_vtep;
         return tunnelPortName;
@@ -306,11 +306,11 @@ public:
     bool getTunnelPort(const std::string& remote_vtep,Port& tunnelPort);
 
     bool addTunnelUser(string remote_vtep, uint32_t vni_id,
-                       uint32_t vlan, tunnel_user_type_e usr,
+                       uint32_t vlan, tunnel_user_t usr,
                        sai_object_id_t vrf_id=SAI_NULL_OBJECT_ID);
 
     bool delTunnelUser(string remote_vtep, uint32_t vni_id,
-                       uint32_t vlan, tunnel_user_type_e usr,
+                       uint32_t vlan, tunnel_user_t usr,
                        sai_object_id_t vrf_id=SAI_NULL_OBJECT_ID);
 
     void deleteTunnelPort(Port &tunnelPort);
@@ -324,9 +324,13 @@ public:
     uint16_t getVlanMappedToVni(const uint32_t vni)
     {
         if (vxlan_vni_vlan_map_table_.find(vni) != std::end(vxlan_vni_vlan_map_table_))
+        {
             return vxlan_vni_vlan_map_table_.at(vni);
+        }
         else
+        {
             return 0;
+        }
     }
 
     void addVlanMappedToVni(uint32_t vni, uint16_t vlan_id)
@@ -480,7 +484,10 @@ class EvpnNvoOrch : public Orch2
 public:
     EvpnNvoOrch(DBConnector *db, const std::string& tableName) : Orch2(db, tableName, request_) { }
 
-    VxlanTunnel* getEVPNVtep() { return source_vtep_ptr;}
+    VxlanTunnel* getEVPNVtep() 
+    { 
+        return source_vtep_ptr;
+    }
 
 private:
     virtual bool addOperation(const Request& request);

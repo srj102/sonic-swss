@@ -5,8 +5,6 @@
 #include <unordered_set>
 #include <stdexcept>
 #include <inttypes.h>
-
-
 #include "sai.h"
 #include "macaddress.h"
 #include "ipaddress.h"
@@ -79,24 +77,24 @@ static inline uint32_t tunnel_map_val (MAP_T map_t)
 
 static inline MAP_T tunnel_map_type (tunnel_map_type_t type, bool isencap)
 {
-    if(isencap)
+    if (isencap)
     {
       switch(type)
       {
-       case TUNNEL_MAP_T_VLAN : return MAP_T::VLAN_ID_TO_VNI;
-       case TUNNEL_MAP_T_VIRTUAL_ROUTER: return MAP_T::VRID_TO_VNI;
-       case TUNNEL_MAP_T_BRIDGE: return MAP_T::BRIDGE_TO_VNI;
-       default: return MAP_T::MAP_TO_INVALID;
+          case TUNNEL_MAP_T_VLAN : return MAP_T::VLAN_ID_TO_VNI;
+          case TUNNEL_MAP_T_VIRTUAL_ROUTER: return MAP_T::VRID_TO_VNI;
+          case TUNNEL_MAP_T_BRIDGE: return MAP_T::BRIDGE_TO_VNI;
+          default: return MAP_T::MAP_TO_INVALID;
       }
     }
     else
     {
       switch(type)
       {
-       case TUNNEL_MAP_T_VLAN : return MAP_T::VNI_TO_VLAN_ID;
-       case TUNNEL_MAP_T_VIRTUAL_ROUTER: return MAP_T::VNI_TO_VRID;
-       case TUNNEL_MAP_T_BRIDGE: return MAP_T::VNI_TO_BRIDGE;
-       default: return MAP_T::MAP_TO_INVALID;
+          case TUNNEL_MAP_T_VLAN : return MAP_T::VNI_TO_VLAN_ID;
+          case TUNNEL_MAP_T_VIRTUAL_ROUTER: return MAP_T::VNI_TO_VRID;
+          case TUNNEL_MAP_T_BRIDGE: return MAP_T::VNI_TO_BRIDGE;
+          default: return MAP_T::MAP_TO_INVALID;
       }
     }
 }
@@ -276,12 +274,12 @@ create_tunnel(
     sai_object_id_t map_list[TUNNEL_MAP_T_MAX_MAPPER+1];
     uint8_t num_map=0;
 
-    for(int i=TUNNEL_MAP_T_VLAN;i<TUNNEL_MAP_T_MAX_MAPPER;i++)
+    for (int i=TUNNEL_MAP_T_VLAN;i<TUNNEL_MAP_T_MAX_MAPPER;i++)
     {
-      if(ids->tunnel_decap_id[i] != SAI_NULL_OBJECT_ID)
+      if (ids->tunnel_decap_id[i] != SAI_NULL_OBJECT_ID)
       {
         map_list[num_map] = ids->tunnel_decap_id[i];
-        SWSS_LOG_NOTICE("create_tunnel:maplist[%d]=0x%lx",num_map,map_list[num_map]);
+        SWSS_LOG_INFO("create_tunnel:maplist[%d]=0x%lx",num_map,map_list[num_map]);
         num_map++;
       }
     }
@@ -294,9 +292,9 @@ create_tunnel(
     sai_object_id_t emap_list[TUNNEL_MAP_T_MAX_MAPPER+1];
     uint8_t num_emap=0;
 
-    for(int i=TUNNEL_MAP_T_VLAN;i<TUNNEL_MAP_T_MAX_MAPPER;i++)
+    for (int i=TUNNEL_MAP_T_VLAN;i<TUNNEL_MAP_T_MAX_MAPPER;i++)
     {
-      if(ids->tunnel_encap_id[i] != SAI_NULL_OBJECT_ID)
+      if (ids->tunnel_encap_id[i] != SAI_NULL_OBJECT_ID)
       {
         emap_list[num_emap] = ids->tunnel_encap_id[i];
         SWSS_LOG_NOTICE("create_tunnel:encapmaplist[%d]=0x%lx",num_emap,emap_list[num_emap]);
@@ -388,7 +386,7 @@ create_tunnel_termination(
     sai_attribute_t attr;
     std::vector<sai_attribute_t> tunnel_attrs;
 
-    if(dstip == nullptr) // It's P2MP tunnel
+    if (dstip == nullptr) // It's P2MP tunnel
     {
         attr.id = SAI_TUNNEL_TERM_TABLE_ENTRY_ATTR_TYPE;
         attr.value.s32 = SAI_TUNNEL_TERM_TABLE_ENTRY_TYPE_P2MP;
@@ -460,24 +458,23 @@ VxlanTunnel::VxlanTunnel(string name, IpAddress srcIp, IpAddress dstIp, tunnel_c
 {
    VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
 
-   if(dstIp.isZero())
+   if (dstIp.isZero())
    {
-     //tunnel_orch->addVTEP(std::unique_ptr<VxlanTunnel>this,srcIp);
-     tunnel_orch->addVTEP(this,srcIp);
-     vtep_ptr = NULL;
+       tunnel_orch->addVTEP(this, srcIp);
+       vtep_ptr = NULL;
    }
-   else if(src_creation_ == TNL_CREATION_SRC_EVPN) 
+   else if (src_creation_ == TNL_CREATION_SRC_EVPN) 
    {
-     vtep_ptr = tunnel_orch->getVTEP(srcIp);
-     tunnel_orch->addRemoveStateTableEntry(name,srcIp, dstIp,
+       vtep_ptr = tunnel_orch->getVTEP(srcIp);
+       tunnel_orch->addRemoveStateTableEntry(name,srcIp, dstIp,
                                            src, true);
    }
 }
 
 VxlanTunnel::~VxlanTunnel()
 {
-   VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
-   tunnel_orch->addRemoveStateTableEntry(tunnel_name_,src_ip_, dst_ip_,
+    VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
+    tunnel_orch->addRemoveStateTableEntry(tunnel_name_,src_ip_, dst_ip_,
                                           src_creation_, false);
 }
 
@@ -491,17 +488,26 @@ bool VxlanTunnel::createTunnel(MAP_T encap, MAP_T decap, uint8_t encap_ttl)
 
         // Only a single mapper type is created
 
-        if(decap == MAP_T::VNI_TO_BRIDGE)
-          TUNNELMAP_SET_BRIDGE(mapper_list);
-        else if(decap == MAP_T::VNI_TO_VLAN_ID)
-          TUNNELMAP_SET_VLAN(mapper_list);
+        if (decap == MAP_T::VNI_TO_BRIDGE)
+        {
+            TUNNELMAP_SET_BRIDGE(mapper_list);
+        }
+        else if (decap == MAP_T::VNI_TO_VLAN_ID)
+        {
+            TUNNELMAP_SET_VLAN(mapper_list);
+        }
         else
-          TUNNELMAP_SET_VRF(mapper_list);
+        {
+            TUNNELMAP_SET_VRF(mapper_list);
+        }
         
-        createMapperHW(mapper_list, (encap == MAP_T::MAP_TO_INVALID) ? USE_DECAP_ONLY: USE_DEDICATED_ENCAP_DECAP);
+        createMapperHw(mapper_list, (encap == MAP_T::MAP_TO_INVALID) ? 
+                       TUNNEL_MAP_USE_DECAP_ONLY: TUNNEL_MAP_USE_DEDICATED_ENCAP_DECAP);
 
         if (encap != MAP_T::MAP_TO_INVALID)
+        {
             ip = &ips;
+        }
 
         ids_.tunnel_id = create_tunnel(&ids_, ip, NULL, gUnderlayIfId, false, encap_ttl);
 
@@ -556,11 +562,12 @@ std::pair<sai_object_id_t, sai_object_id_t> VxlanTunnel::getMapperEntry(uint32_t
     return std::make_pair(SAI_NULL_OBJECT_ID, SAI_NULL_OBJECT_ID);
 }
 
-void VxlanTunnel::updateNextHop(IpAddress& ipAddr, MacAddress macAddress, uint32_t vni, sai_object_id_t nh_id)
+void VxlanTunnel::updateNextHop(IpAddress& ipAddr, MacAddress macAddress, 
+                                uint32_t vni, sai_object_id_t nh_id)
 {
     auto key = nh_key_t(ipAddr, macAddress, vni);
 
-    SWSS_LOG_NOTICE("Update NH tunnel for ip %s, mac %s, vni %d",
+    SWSS_LOG_INFO("Update NH tunnel for ip %s, mac %s, vni %d",
             ipAddr.to_string().c_str(), macAddress.to_string().c_str(), vni);
 
     auto it = nh_tunnels_.find(key);
@@ -568,14 +575,17 @@ void VxlanTunnel::updateNextHop(IpAddress& ipAddr, MacAddress macAddress, uint32
     {
         nh_tunnels_[key] = {nh_id, 1};
         return;
-    } else {
-        SWSS_LOG_NOTICE("Dup Update NH tunnel for ip %s, mac %s, vni %d",
+    } 
+    else 
+    {
+        SWSS_LOG_INFO("Dup Update NH tunnel for ip %s, mac %s, vni %d",
             ipAddr.to_string().c_str(), macAddress.to_string().c_str(), vni);
     }
 
 }
 
-sai_object_id_t VxlanTunnel::getNextHop(IpAddress& ipAddr, MacAddress macAddress, uint32_t vni) const
+sai_object_id_t VxlanTunnel::getNextHop(IpAddress& ipAddr, 
+                                        MacAddress macAddress, uint32_t vni) const
 {
     auto key = nh_key_t(ipAddr, macAddress, vni);
 
@@ -592,7 +602,7 @@ void VxlanTunnel::incNextHopRefCount(IpAddress& ipAddr, MacAddress macAddress, u
 {
     auto key = nh_key_t(ipAddr, macAddress, vni);
     nh_tunnels_[key].ref_count ++;
-    SWSS_LOG_NOTICE("refcnt increment NH tunnel for ip %s, mac %s, vni %d, ref_count %d",
+    SWSS_LOG_INFO("refcnt increment NH tunnel for ip %s, mac %s, vni %d, ref_count %d",
             ipAddr.to_string().c_str(), macAddress.to_string().c_str(), vni,
             nh_tunnels_[key].ref_count);
 
@@ -602,7 +612,7 @@ void VxlanTunnel::decNextHopRefCount(IpAddress& ipAddr, MacAddress macAddress, u
 {
     auto key = nh_key_t(ipAddr, macAddress, vni);
     nh_tunnels_[key].ref_count --;
-    SWSS_LOG_NOTICE("refcnt decrement NH tunnel for ip %s, mac %s, vni %d, ref_count %d",
+    SWSS_LOG_INFO("refcnt decrement NH tunnel for ip %s, mac %s, vni %d, ref_count %d",
                     ipAddr.to_string().c_str(), macAddress.to_string().c_str(), vni,
                     nh_tunnels_[key].ref_count);
 
@@ -615,12 +625,12 @@ bool VxlanTunnel::removeNextHop(IpAddress& ipAddr, MacAddress macAddress, uint32
     auto it = nh_tunnels_.find(key);
     if (it == nh_tunnels_.end())
     {
-        SWSS_LOG_NOTICE("remove NH tunnel for ip %s, mac %s, vni %d doesn't exist",
+        SWSS_LOG_INFO("remove NH tunnel for ip %s, mac %s, vni %d doesn't exist",
                         ipAddr.to_string().c_str(), macAddress.to_string().c_str(), vni);
         return false;
     }
 
-    SWSS_LOG_NOTICE("remove NH tunnel for ip %s, mac %s, vni %d, ref_count %d",
+    SWSS_LOG_INFO("remove NH tunnel for ip %s, mac %s, vni %d, ref_count %d",
                     ipAddr.to_string().c_str(), macAddress.to_string().c_str(), vni,
                     nh_tunnels_[key].ref_count);
 
@@ -631,7 +641,7 @@ bool VxlanTunnel::removeNextHop(IpAddress& ipAddr, MacAddress macAddress, uint32
     {
         if (sai_next_hop_api->remove_next_hop(nh_tunnels_[key].nh_id) != SAI_STATUS_SUCCESS)
         {
-            SWSS_LOG_NOTICE("delete NH tunnel for ip '%s', mac '%s' vni %d failed",
+            SWSS_LOG_INFO("delete NH tunnel for ip '%s', mac '%s' vni %d failed",
                             ipAddr.to_string().c_str(), macAddress.to_string().c_str(), vni);
             string err_msg = "NH tunnel delete failed for " + ipAddr.to_string();
             throw std::runtime_error(err_msg);
@@ -640,238 +650,209 @@ bool VxlanTunnel::removeNextHop(IpAddress& ipAddr, MacAddress macAddress, uint32
         nh_tunnels_.erase(key);
     }
 
-    SWSS_LOG_NOTICE("NH tunnel for ip '%s', mac '%s' vni %d updated/deleted",
+    SWSS_LOG_INFO("NH tunnel for ip '%s', mac '%s' vni %d updated/deleted",
                     ipAddr.to_string().c_str(), macAddress.to_string().c_str(), vni);
 
     return true;
 }
 
-bool VxlanTunnel::deleteMapperHW(uint8_t mapper_list,
-                                 tunnel_map_src_t map_src)
-{
-    sai_status_t status = SAI_STATUS_SUCCESS;
-
-    SWSS_LOG_INFO("Enter deleteMapper HW maplst=%d src=%d",mapper_list, map_src);
-
-    try
-    {
-      if(map_src == USE_DEDICATED_ENCAP_DECAP)
-      {
-        if(IS_TUNNELMAP_SET_VLAN(mapper_list))
-        {
-          status = sai_tunnel_api->remove_tunnel_map(ids_.tunnel_decap_id[TUNNEL_MAP_T_VLAN]);
-          SWSS_LOG_INFO("deletevlandecap = %d", status);
-          status = sai_tunnel_api->remove_tunnel_map(ids_.tunnel_encap_id[TUNNEL_MAP_T_VLAN]);
-          SWSS_LOG_INFO("deletevlanencap = %d", status);
-        }
-
-        if(IS_TUNNELMAP_SET_VRF(mapper_list))
-        {
-          status = sai_tunnel_api->remove_tunnel_map(ids_.tunnel_decap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER]);
-          SWSS_LOG_INFO("deleteVRFdecap = %d", status);
-          status = sai_tunnel_api->remove_tunnel_map(ids_.tunnel_encap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER]);
-          SWSS_LOG_INFO("deleteVRFencap = %d", status);
-        }
-
-        if(IS_TUNNELMAP_SET_BRIDGE(mapper_list))
-        {
-          sai_tunnel_api->remove_tunnel_map(ids_.tunnel_decap_id[TUNNEL_MAP_T_BRIDGE]);
-          sai_tunnel_api->remove_tunnel_map(ids_.tunnel_encap_id[TUNNEL_MAP_T_BRIDGE]);
-        }
-      }
-      else if(map_src == USE_COMMON_DECAP_DEDICATED_ENCAP)
-      {
-        if(IS_TUNNELMAP_SET_VLAN(mapper_list))
-        {
-          sai_tunnel_api->remove_tunnel_map(ids_.tunnel_encap_id[TUNNEL_MAP_T_VLAN]);
-        }
-
-        if(IS_TUNNELMAP_SET_VRF(mapper_list))
-        {
-          sai_tunnel_api->remove_tunnel_map(ids_.tunnel_encap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER]);
-        }
-
-        if(IS_TUNNELMAP_SET_BRIDGE(mapper_list))
-        {
-          sai_tunnel_api->remove_tunnel_map(ids_.tunnel_encap_id[TUNNEL_MAP_T_BRIDGE]);
-        }
-      }
-      else if(map_src == USE_DECAP_ONLY)
-      {
-        if(IS_TUNNELMAP_SET_VLAN(mapper_list))
-        {
-          status = sai_tunnel_api->remove_tunnel_map(ids_.tunnel_decap_id[TUNNEL_MAP_T_VLAN]);
-          SWSS_LOG_INFO("deletevlandecap = %d", status);
-        }
-
-        if(IS_TUNNELMAP_SET_VRF(mapper_list))
-        {
-          status = sai_tunnel_api->remove_tunnel_map(ids_.tunnel_decap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER]);
-          SWSS_LOG_INFO("deleteVRFdecap = %d", status);
-        }
-
-        if(IS_TUNNELMAP_SET_BRIDGE(mapper_list))
-        {
-          status = sai_tunnel_api->remove_tunnel_map(ids_.tunnel_decap_id[TUNNEL_MAP_T_BRIDGE]);
-          SWSS_LOG_INFO("deletebridgedecap = %d", status);
-        }
-      }
-    }
-
-    catch (const std::runtime_error& error)
-    {
-      SWSS_LOG_ERROR("Error deleting mapper %s: %s", tunnel_name_.c_str(), error.what());
-      // FIXME: add code to remove already created objects
-      return false;
-    }
-
-    return true;
-}
-
-bool VxlanTunnel::createMapperHW(uint8_t mapper_list, 
-                                 tunnel_map_src_t map_src)
+bool VxlanTunnel::deleteMapperHw(uint8_t mapper_list, tunnel_map_use_t map_src)
 {
     try
     {
-        for(int i=TUNNEL_MAP_T_VLAN;i<TUNNEL_MAP_T_MAX_MAPPER;i++)
+        if (map_src == TUNNEL_MAP_USE_DEDICATED_ENCAP_DECAP)
         {
-          ids_.tunnel_decap_id[i] = SAI_NULL_OBJECT_ID;
-          ids_.tunnel_encap_id[i] = SAI_NULL_OBJECT_ID;
+            if (IS_TUNNELMAP_SET_VLAN(mapper_list))
+            {
+                remove_tunnel_map(ids_.tunnel_decap_id[TUNNEL_MAP_T_VLAN]);
+                remove_tunnel_map(ids_.tunnel_encap_id[TUNNEL_MAP_T_VLAN]);
+            }
+    
+            if (IS_TUNNELMAP_SET_VRF(mapper_list))
+            {
+                remove_tunnel_map(ids_.tunnel_decap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER]);
+                remove_tunnel_map(ids_.tunnel_encap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER]);
+            }
+    
+            if (IS_TUNNELMAP_SET_BRIDGE(mapper_list))
+            {
+                remove_tunnel_map(ids_.tunnel_decap_id[TUNNEL_MAP_T_BRIDGE]);
+                remove_tunnel_map(ids_.tunnel_encap_id[TUNNEL_MAP_T_BRIDGE]);
+            }
         }
-
-        if(USE_DEDICATED_ENCAP_DECAP == map_src)
+        else if (map_src == TUNNEL_MAP_USE_COMMON_DECAP_DEDICATED_ENCAP)
         {
-           if(IS_TUNNELMAP_SET_VLAN(mapper_list))
-           {
-             ids_.tunnel_decap_id[TUNNEL_MAP_T_VLAN] = create_tunnel_map(MAP_T::VNI_TO_VLAN_ID);
-             ids_.tunnel_encap_id[TUNNEL_MAP_T_VLAN] = create_tunnel_map(MAP_T::VLAN_ID_TO_VNI);
-
-             TUNNELMAP_SET_VLAN(encap_dedicated_mappers_);
-             TUNNELMAP_SET_VLAN(decap_dedicated_mappers_);
-           }
-
-           if(IS_TUNNELMAP_SET_VRF(mapper_list))
-           {
-             ids_.tunnel_decap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = create_tunnel_map(MAP_T::VNI_TO_VRID);
-             ids_.tunnel_encap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = create_tunnel_map(MAP_T::VRID_TO_VNI);
-             TUNNELMAP_SET_VRF(encap_dedicated_mappers_);
-             TUNNELMAP_SET_VRF(decap_dedicated_mappers_);
-           }
-
-           if(IS_TUNNELMAP_SET_BRIDGE(mapper_list))
-           {
-             ids_.tunnel_decap_id[TUNNEL_MAP_T_BRIDGE] = create_tunnel_map(MAP_T::VNI_TO_BRIDGE);
-             ids_.tunnel_encap_id[TUNNEL_MAP_T_BRIDGE] = create_tunnel_map(MAP_T::BRIDGE_TO_VNI);
-
-             TUNNELMAP_SET_BRIDGE(encap_dedicated_mappers_);
-             TUNNELMAP_SET_BRIDGE(decap_dedicated_mappers_);
-           }
+            if (IS_TUNNELMAP_SET_VLAN(mapper_list))
+            {
+                remove_tunnel_map(ids_.tunnel_encap_id[TUNNEL_MAP_T_VLAN]);
+            }
+    
+            if (IS_TUNNELMAP_SET_VRF(mapper_list))
+            {
+                remove_tunnel_map(ids_.tunnel_encap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER]);
+            }
+    
+            if (IS_TUNNELMAP_SET_BRIDGE(mapper_list))
+            {
+                remove_tunnel_map(ids_.tunnel_encap_id[TUNNEL_MAP_T_BRIDGE]);
+            }
         }
-        else if (map_src == USE_COMMON_DECAP_DEDICATED_ENCAP)
+        else if (map_src == TUNNEL_MAP_USE_DECAP_ONLY)
         {
-           if(IS_TUNNELMAP_SET_VLAN(mapper_list))
-           {
-             ids_.tunnel_decap_id[TUNNEL_MAP_T_VLAN] = vtep_ptr->getDecapMapId(TUNNEL_MAP_T_VLAN);
-             ids_.tunnel_encap_id[TUNNEL_MAP_T_VLAN] = create_tunnel_map(MAP_T::VLAN_ID_TO_VNI);
-             TUNNELMAP_SET_VLAN(encap_dedicated_mappers_);
-           }
-
-           if(IS_TUNNELMAP_SET_VRF(mapper_list))
-           {
-             ids_.tunnel_decap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = vtep_ptr->getDecapMapId(TUNNEL_MAP_T_VIRTUAL_ROUTER);
-             ids_.tunnel_encap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = create_tunnel_map(MAP_T::VRID_TO_VNI);
-             TUNNELMAP_SET_VRF(encap_dedicated_mappers_);
-           }
-
-           if(IS_TUNNELMAP_SET_BRIDGE(mapper_list))
-           {
-             ids_.tunnel_decap_id[TUNNEL_MAP_T_BRIDGE] = vtep_ptr->getDecapMapId(TUNNEL_MAP_T_BRIDGE);
-
-             ids_.tunnel_encap_id[TUNNEL_MAP_T_BRIDGE] = create_tunnel_map(MAP_T::VRID_TO_VNI);
-
-             TUNNELMAP_SET_BRIDGE(encap_dedicated_mappers_);
-           }
-
-        }
-        else if (USE_COMMON_ENCAP_DECAP == map_src)
-        {
-           if(IS_TUNNELMAP_SET_VLAN(mapper_list))
-           {
-             ids_.tunnel_decap_id[TUNNEL_MAP_T_VLAN] = vtep_ptr->getDecapMapId(TUNNEL_MAP_T_VLAN);
-             ids_.tunnel_encap_id[TUNNEL_MAP_T_VLAN] = vtep_ptr->getEncapMapId(TUNNEL_MAP_T_VLAN);
-           }
-
-           if(IS_TUNNELMAP_SET_VRF(mapper_list))
-           {
-             ids_.tunnel_decap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = vtep_ptr->getDecapMapId(TUNNEL_MAP_T_VIRTUAL_ROUTER);
-             ids_.tunnel_encap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = vtep_ptr->getEncapMapId(TUNNEL_MAP_T_VIRTUAL_ROUTER);
-           }
-
-           if(IS_TUNNELMAP_SET_BRIDGE(mapper_list))
-           {
-             ids_.tunnel_decap_id[TUNNEL_MAP_T_BRIDGE] = vtep_ptr->getDecapMapId(TUNNEL_MAP_T_BRIDGE);
-             ids_.tunnel_encap_id[TUNNEL_MAP_T_BRIDGE] = vtep_ptr->getEncapMapId(TUNNEL_MAP_T_BRIDGE);
-           }
-
-        }
-        else if(USE_DECAP_ONLY == map_src)
-        {
-           if(IS_TUNNELMAP_SET_VLAN(mapper_list))
-           {
-             ids_.tunnel_decap_id[TUNNEL_MAP_T_VLAN] = create_tunnel_map(MAP_T::VNI_TO_VLAN_ID);
-             TUNNELMAP_SET_VLAN(decap_dedicated_mappers_);
-           }
-
-           if(IS_TUNNELMAP_SET_VRF(mapper_list))
-           {
-             ids_.tunnel_decap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = create_tunnel_map(MAP_T::VNI_TO_VRID);
-             TUNNELMAP_SET_VRF(decap_dedicated_mappers_);
-           }
-
-           if(IS_TUNNELMAP_SET_BRIDGE(mapper_list))
-           {
-             ids_.tunnel_encap_id[TUNNEL_MAP_T_BRIDGE] = create_tunnel_map(MAP_T::BRIDGE_TO_VNI);
-
-             TUNNELMAP_SET_BRIDGE(decap_dedicated_mappers_);
-           }
+            if (IS_TUNNELMAP_SET_VLAN(mapper_list))
+            {
+                remove_tunnel_map(ids_.tunnel_decap_id[TUNNEL_MAP_T_VLAN]);
+            }
+    
+            if (IS_TUNNELMAP_SET_VRF(mapper_list))
+            {
+                remove_tunnel_map(ids_.tunnel_decap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER]);
+            }
+    
+            if (IS_TUNNELMAP_SET_BRIDGE(mapper_list))
+            {
+                remove_tunnel_map(ids_.tunnel_decap_id[TUNNEL_MAP_T_BRIDGE]);
+            }
         }
     }
 
     catch (const std::runtime_error& error)
     {
-        SWSS_LOG_ERROR("Error creating tunnel %s: %s", tunnel_name_.c_str(), error.what());
-        // FIXME: add code to remove already created objects
+        SWSS_LOG_ERROR("Error deleting mapper %s: %s", tunnel_name_.c_str(), error.what());
         return false;
     }
 
     return true;
 }
 
-bool VxlanTunnel::deleteTunnelHW(uint8_t mapper_list, 
-                                 tunnel_map_src_t map_src, bool with_term)
+bool VxlanTunnel::createMapperHw(uint8_t mapper_list, tunnel_map_use_t map_src)
 {
-    SWSS_LOG_INFO("Enter Delete Tunnel HW");
     try
     {
-      sai_status_t ret;
+        for (int i=TUNNEL_MAP_T_VLAN; i<TUNNEL_MAP_T_MAX_MAPPER; i++)
+        {
+            ids_.tunnel_decap_id[i] = SAI_NULL_OBJECT_ID;
+            ids_.tunnel_encap_id[i] = SAI_NULL_OBJECT_ID;
+        }
 
-      if(with_term)
-      {
-         ret = sai_tunnel_api->remove_tunnel_term_table_entry(ids_.tunnel_term_id);
-         SWSS_LOG_INFO("term table delete reststatus = %d",ret);
-      }
+        if (TUNNEL_MAP_USE_DEDICATED_ENCAP_DECAP == map_src)
+        {
+            if (IS_TUNNELMAP_SET_VLAN(mapper_list))
+            {
+                ids_.tunnel_decap_id[TUNNEL_MAP_T_VLAN] = create_tunnel_map(MAP_T::VNI_TO_VLAN_ID);
+                ids_.tunnel_encap_id[TUNNEL_MAP_T_VLAN] = create_tunnel_map(MAP_T::VLAN_ID_TO_VNI);
+                TUNNELMAP_SET_VLAN(encap_dedicated_mappers_);
+                TUNNELMAP_SET_VLAN(decap_dedicated_mappers_);
+            }
 
-      ret = sai_tunnel_api->remove_tunnel(ids_.tunnel_id);
-      SWSS_LOG_INFO("tunnel table delete reststatus = %d",ret);
-      deleteMapperHW(mapper_list, map_src);
-      //total_diptunnel_del++;
+            if (IS_TUNNELMAP_SET_VRF(mapper_list))
+            {
+                ids_.tunnel_decap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = create_tunnel_map(MAP_T::VNI_TO_VRID);
+                ids_.tunnel_encap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = create_tunnel_map(MAP_T::VRID_TO_VNI);
+                TUNNELMAP_SET_VRF(encap_dedicated_mappers_);
+                TUNNELMAP_SET_VRF(decap_dedicated_mappers_);
+            }
+
+            if (IS_TUNNELMAP_SET_BRIDGE(mapper_list))
+            {
+               ids_.tunnel_decap_id[TUNNEL_MAP_T_BRIDGE] = create_tunnel_map(MAP_T::VNI_TO_BRIDGE);
+               ids_.tunnel_encap_id[TUNNEL_MAP_T_BRIDGE] = create_tunnel_map(MAP_T::BRIDGE_TO_VNI);
+               TUNNELMAP_SET_BRIDGE(encap_dedicated_mappers_);
+               TUNNELMAP_SET_BRIDGE(decap_dedicated_mappers_);
+            }
+        }
+        else if (map_src == TUNNEL_MAP_USE_COMMON_DECAP_DEDICATED_ENCAP)
+        {
+            if (IS_TUNNELMAP_SET_VLAN(mapper_list))
+            {
+                ids_.tunnel_decap_id[TUNNEL_MAP_T_VLAN] = vtep_ptr->getDecapMapId(TUNNEL_MAP_T_VLAN);
+                ids_.tunnel_encap_id[TUNNEL_MAP_T_VLAN] = create_tunnel_map(MAP_T::VLAN_ID_TO_VNI);
+                TUNNELMAP_SET_VLAN(encap_dedicated_mappers_);
+            }
+
+            if (IS_TUNNELMAP_SET_VRF(mapper_list))
+            {
+                ids_.tunnel_decap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = vtep_ptr->getDecapMapId(TUNNEL_MAP_T_VIRTUAL_ROUTER);
+                ids_.tunnel_encap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = create_tunnel_map(MAP_T::VRID_TO_VNI);
+                TUNNELMAP_SET_VRF(encap_dedicated_mappers_);
+            }
+
+            if (IS_TUNNELMAP_SET_BRIDGE(mapper_list))
+            {
+                ids_.tunnel_decap_id[TUNNEL_MAP_T_BRIDGE] = vtep_ptr->getDecapMapId(TUNNEL_MAP_T_BRIDGE);
+                ids_.tunnel_encap_id[TUNNEL_MAP_T_BRIDGE] = create_tunnel_map(MAP_T::BRIDGE_TO_VNI);
+                TUNNELMAP_SET_BRIDGE(encap_dedicated_mappers_);
+            }
+        }
+        else if (TUNNEL_MAP_USE_COMMON_ENCAP_DECAP == map_src)
+        {
+            if (IS_TUNNELMAP_SET_VLAN(mapper_list))
+            {
+                ids_.tunnel_decap_id[TUNNEL_MAP_T_VLAN] = vtep_ptr->getDecapMapId(TUNNEL_MAP_T_VLAN);
+                ids_.tunnel_encap_id[TUNNEL_MAP_T_VLAN] = vtep_ptr->getEncapMapId(TUNNEL_MAP_T_VLAN);
+            }
+
+            if (IS_TUNNELMAP_SET_VRF(mapper_list))
+            {
+                ids_.tunnel_decap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = vtep_ptr->getDecapMapId(TUNNEL_MAP_T_VIRTUAL_ROUTER);
+                ids_.tunnel_encap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = vtep_ptr->getEncapMapId(TUNNEL_MAP_T_VIRTUAL_ROUTER);
+            }
+ 
+            if (IS_TUNNELMAP_SET_BRIDGE(mapper_list))
+            {
+                ids_.tunnel_decap_id[TUNNEL_MAP_T_BRIDGE] = vtep_ptr->getDecapMapId(TUNNEL_MAP_T_BRIDGE);
+                ids_.tunnel_encap_id[TUNNEL_MAP_T_BRIDGE] = vtep_ptr->getEncapMapId(TUNNEL_MAP_T_BRIDGE);
+            }
+        }
+        else if (TUNNEL_MAP_USE_DECAP_ONLY == map_src)
+        {
+            if (IS_TUNNELMAP_SET_VLAN(mapper_list))
+            {
+                ids_.tunnel_decap_id[TUNNEL_MAP_T_VLAN] = create_tunnel_map(MAP_T::VNI_TO_VLAN_ID);
+                TUNNELMAP_SET_VLAN(decap_dedicated_mappers_);
+            }
+ 
+            if (IS_TUNNELMAP_SET_VRF(mapper_list))
+            {
+                ids_.tunnel_decap_id[TUNNEL_MAP_T_VIRTUAL_ROUTER] = create_tunnel_map(MAP_T::VNI_TO_VRID);
+                TUNNELMAP_SET_VRF(decap_dedicated_mappers_);
+            }
+ 
+            if (IS_TUNNELMAP_SET_BRIDGE(mapper_list))
+            {
+                ids_.tunnel_encap_id[TUNNEL_MAP_T_BRIDGE] = create_tunnel_map(MAP_T::BRIDGE_TO_VNI);
+                TUNNELMAP_SET_BRIDGE(decap_dedicated_mappers_);
+            }
+        }
     }
 
     catch (const std::runtime_error& error)
     {
-      SWSS_LOG_ERROR("Error deleting tunnel %s: %s", tunnel_name_.c_str(), error.what());
-      // FIXME: add code to remove already created objects
-      return false;
+        SWSS_LOG_ERROR("Error creating tunnel %s: %s", tunnel_name_.c_str(), error.what());
+        return false;
+    }
+
+    return true;
+}
+
+bool VxlanTunnel::deleteTunnelHw(uint8_t mapper_list, tunnel_map_use_t map_src, 
+                                                                  bool with_term)
+{
+    try
+    {
+      if (with_term)
+      {
+          remove_tunnel_termination(ids_.tunnel_term_id);
+      }
+
+      remove_tunnel_termination(ids_.tunnel_id);
+      deleteMapperHw(mapper_list, map_src);
+    }
+
+    catch (const std::runtime_error& error)
+    {
+        SWSS_LOG_ERROR("Error deleting tunnel %s: %s", tunnel_name_.c_str(), error.what());
+        return false;
     }
 
     active_ = false;
@@ -881,8 +862,8 @@ bool VxlanTunnel::deleteTunnelHW(uint8_t mapper_list,
 
 //Creation of SAI Tunnel Object with multiple mapper types
 
-bool VxlanTunnel::createTunnelHW(uint8_t mapper_list, 
-                                 tunnel_map_src_t map_src, bool with_term)
+bool VxlanTunnel::createTunnelHw(uint8_t mapper_list, tunnel_map_use_t map_src, 
+                                                                  bool with_term)
 {
     bool p2p = false;
 
@@ -891,7 +872,7 @@ bool VxlanTunnel::createTunnelHW(uint8_t mapper_list,
         sai_ip_address_t ips, ipd, *ip=nullptr;
         swss::copy(ips, src_ip_);
 
-        createMapperHW(mapper_list, map_src);
+        createMapperHw(mapper_list, map_src);
 
         ip = nullptr;
         if (!dst_ip_.isZero())
@@ -900,13 +881,15 @@ bool VxlanTunnel::createTunnelHW(uint8_t mapper_list,
             ip = &ipd;
             p2p = (src_creation_ == TNL_CREATION_SRC_EVPN)? true:false;
             SWSS_LOG_WARN("creation src = %d",src_creation_);
-            //total_diptunnel_add++;
         }
 
         ids_.tunnel_id = create_tunnel(&ids_, &ips, ip, gUnderlayIfId, p2p);
 
-        if(with_term)
-          ids_.tunnel_term_id = create_tunnel_termination(ids_.tunnel_id, ips, ip, gVirtualRouterId);
+        if (with_term)
+        {
+            ids_.tunnel_term_id = create_tunnel_termination(ids_.tunnel_id, ips, 
+                                                            ip, gVirtualRouterId);
+        }
 
         active_ = true;
     }
@@ -914,7 +897,6 @@ bool VxlanTunnel::createTunnelHW(uint8_t mapper_list,
     catch (const std::runtime_error& error)
     {
         SWSS_LOG_ERROR("Error creating tunnel %s: %s", tunnel_name_.c_str(), error.what());
-        // FIXME: add code to remove already created objects
         return false;
     }
 
@@ -924,33 +906,34 @@ bool VxlanTunnel::createTunnelHW(uint8_t mapper_list,
 
 void VxlanTunnel::deletePendingSIPTunnel()
 {
-   if((getDipTunnelCnt() == 0) && del_tnl_hw_pending)
+   if ((getDipTunnelCnt() == 0) && del_tnl_hw_pending)
    {
-    uint8_t mapper_list=0;
-    TUNNELMAP_SET_VLAN(mapper_list);
-    TUNNELMAP_SET_VRF(mapper_list);
-    deleteTunnelHW(mapper_list, USE_DEDICATED_ENCAP_DECAP);
-    del_tnl_hw_pending = false;
-    SWSS_LOG_INFO("Removing SIP Tunnel HW which is pending");
+       uint8_t mapper_list=0;
+
+       TUNNELMAP_SET_VLAN(mapper_list);
+       TUNNELMAP_SET_VRF(mapper_list);
+       deleteTunnelHw(mapper_list, TUNNEL_MAP_USE_DEDICATED_ENCAP_DECAP);
+       del_tnl_hw_pending = false;
+       SWSS_LOG_INFO("Removing SIP Tunnel HW which is pending");
    }
 
    return;
 }
+
 int VxlanTunnel::getDipTunnelCnt()
 {
-  int ret;
-
-  ret = (int)tnl_users_.size();
-  return ret;
+    int ret;
+  
+    ret = (int)tnl_users_.size();
+    return ret;
 }
 
 void VxlanTunnel::increment_spurious_imr_add(const std::string remote_vtep)
 {
-    std::map<const std::string, tunnel_refcnt_t>::iterator it;
     tunnel_refcnt_t tnl_refcnts;
 
-    it = tnl_users_.find(remote_vtep); 
-    if(it == tnl_users_.end())
+    auto it = tnl_users_.find(remote_vtep); 
+    if (it == tnl_users_.end())
       return ; 
     else
     {
@@ -962,11 +945,10 @@ void VxlanTunnel::increment_spurious_imr_add(const std::string remote_vtep)
 
 void VxlanTunnel::increment_spurious_imr_del(const std::string remote_vtep)
 {
-    std::map<const std::string, tunnel_refcnt_t>::iterator it;
     tunnel_refcnt_t tnl_refcnts;
 
-    it = tnl_users_.find(remote_vtep); 
-    if(it == tnl_users_.end())
+    auto it = tnl_users_.find(remote_vtep); 
+    if (it == tnl_users_.end())
       return ; 
     else
     {
@@ -978,11 +960,10 @@ void VxlanTunnel::increment_spurious_imr_del(const std::string remote_vtep)
 
 int VxlanTunnel::getDipTunnelRefCnt(const std::string remote_vtep)
 {
-    std::map<const std::string, tunnel_refcnt_t>::iterator it;
     tunnel_refcnt_t tnl_refcnts;
 
-    it = tnl_users_.find(remote_vtep); 
-    if(it == tnl_users_.end())
+    auto it = tnl_users_.find(remote_vtep); 
+    if (it == tnl_users_.end())
       return -1; 
     else
     {
@@ -993,11 +974,10 @@ int VxlanTunnel::getDipTunnelRefCnt(const std::string remote_vtep)
 
 int VxlanTunnel::getDipTunnelIMRRefCnt(const std::string remote_vtep)
 {
-    std::map<const std::string, tunnel_refcnt_t>::iterator it;
     tunnel_refcnt_t tnl_refcnts;
 
-    it = tnl_users_.find(remote_vtep); 
-    if(it == tnl_users_.end())
+    auto it = tnl_users_.find(remote_vtep); 
+    if (it == tnl_users_.end())
       return -1; 
     else
     {
@@ -1008,11 +988,10 @@ int VxlanTunnel::getDipTunnelIMRRefCnt(const std::string remote_vtep)
 
 int VxlanTunnel::getDipTunnelIPRefCnt(const std::string remote_vtep)
 {
-    std::map<const std::string, tunnel_refcnt_t>::iterator it;
     tunnel_refcnt_t tnl_refcnts;
 
-    it = tnl_users_.find(remote_vtep);
-    if(it == tnl_users_.end())
+    auto it = tnl_users_.find(remote_vtep);
+    if (it == tnl_users_.end())
       return -1;
     else
     {
@@ -1022,31 +1001,31 @@ int VxlanTunnel::getDipTunnelIPRefCnt(const std::string remote_vtep)
 }
 
 void VxlanTunnel::updateDipTunnelRefCnt(bool inc, tunnel_refcnt_t& tnl_refcnts, 
-                                        tunnel_user_type_e usr)
+                                        tunnel_user_t usr)
 {
      switch(usr)
      {
-       case TNL_SRC_IMR: 
+       case TUNNEL_USER_IMR: 
        {
-         if(inc)
+         if (inc)
              tnl_refcnts.imr_refcnt++;
          else
              tnl_refcnts.imr_refcnt--;
 
          break;
        }
-       case TNL_SRC_MAC: 
+       case TUNNEL_USER_MAC: 
        {
-         if(inc)
+         if (inc)
              tnl_refcnts.mac_refcnt++;
          else
              tnl_refcnts.mac_refcnt--;
 
          break;
        }
-       case TNL_SRC_IP: 
+       case TUNNEL_USER_IP: 
        {
-         if(inc)
+         if (inc)
              tnl_refcnts.ip_refcnt++;
          else
              tnl_refcnts.ip_refcnt--;
@@ -1059,83 +1038,82 @@ void VxlanTunnel::updateDipTunnelRefCnt(bool inc, tunnel_refcnt_t& tnl_refcnts,
 
 VxlanTunnel* VxlanTunnel::getDipTunnel(const std::string dip)
 {
-    std::map<const std::string, tunnel_refcnt_t>::iterator it;
     tunnel_refcnt_t tnl_refcnts;
 
-    it = tnl_users_.find(dip); 
-    if(it == tnl_users_.end())
-      return NULL; 
+    auto it = tnl_users_.find(dip); 
+    if (it == tnl_users_.end())
+    {
+        return NULL; 
+    }
     else
     {
-      tnl_refcnts = it->second;
-      return(tnl_refcnts.dip_tunnel);
+        tnl_refcnts = it->second;
+        return(tnl_refcnts.dip_tunnel);
     }
 }
 
-bool VxlanTunnel::createDynamicDIPTunnel(const std::string dip, tunnel_user_type_e usr)
+bool VxlanTunnel::createDynamicDIPTunnel(const std::string dip, tunnel_user_t usr)
 {
     uint8_t mapper_list = 0;
     tunnel_refcnt_t tnl_refcnts;
-    std::map<const std::string, tunnel_refcnt_t>::iterator it;
     VxlanTunnel* dip_tunnel=NULL;
     VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
 
-    it = tnl_users_.find(dip); 
-    if(it == tnl_users_.end())
+    auto it = tnl_users_.find(dip); 
+    if (it == tnl_users_.end())
     {
-       const string tunnel_name = "EVPN_"+dip;
-       auto dipaddr = IpAddress(dip);
-       dip_tunnel = (new VxlanTunnel(tunnel_name, src_ip_, dipaddr, TNL_CREATION_SRC_EVPN));
-       tunnel_orch->addTunnel(tunnel_name,dip_tunnel);
+        const string tunnel_name = "EVPN_"+dip;
+        auto dipaddr = IpAddress(dip);
+        dip_tunnel = (new VxlanTunnel(tunnel_name, src_ip_, dipaddr, TNL_CREATION_SRC_EVPN));
+        tunnel_orch->addTunnel(tunnel_name,dip_tunnel);
 
-       memset(&tnl_refcnts,0,sizeof(tunnel_refcnt_t));
-       updateDipTunnelRefCnt(true,tnl_refcnts,usr);
-       tnl_refcnts.dip_tunnel = dip_tunnel;
-       tnl_users_[dip] = tnl_refcnts;
+        memset(&tnl_refcnts,0,sizeof(tunnel_refcnt_t));
+        updateDipTunnelRefCnt(true,tnl_refcnts,usr);
+        tnl_refcnts.dip_tunnel = dip_tunnel;
+        tnl_users_[dip] = tnl_refcnts;
 
-       TUNNELMAP_SET_VLAN(mapper_list);
-       TUNNELMAP_SET_VRF(mapper_list);
-       dip_tunnel->createTunnelHW(mapper_list,USE_COMMON_ENCAP_DECAP, false);
-       SWSS_LOG_NOTICE("Created P2P Tunnel remote IP %s ", dip.c_str());
+        TUNNELMAP_SET_VLAN(mapper_list);
+        TUNNELMAP_SET_VRF(mapper_list);
+        dip_tunnel->createTunnelHw(mapper_list,TUNNEL_MAP_USE_COMMON_ENCAP_DECAP, false);
+        SWSS_LOG_NOTICE("Created P2P Tunnel remote IP %s ", dip.c_str());
     }
     else 
     {
-       tnl_refcnts = it->second;
-       updateDipTunnelRefCnt(true,tnl_refcnts,usr);
-       tnl_users_[dip] = tnl_refcnts;
+        tnl_refcnts = it->second;
+        updateDipTunnelRefCnt(true,tnl_refcnts,usr);
+        tnl_users_[dip] = tnl_refcnts;
     }
 
     return true;
 }
 
-bool VxlanTunnel::deleteDynamicDIPTunnel(const std::string dip, tunnel_user_type_e usr, bool update_refcnt)
+bool VxlanTunnel::deleteDynamicDIPTunnel(const std::string dip, tunnel_user_t usr, 
+                                                                bool update_refcnt)
 {
     uint8_t mapper_list = 0;
     tunnel_refcnt_t tnl_refcnts;
-    std::map<const std::string, tunnel_refcnt_t>::iterator it;
     VxlanTunnel* dip_tunnel = NULL;
     VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
     Port tunnelPort;
 
-    SWSS_LOG_INFO("Delete Dynamic DIP Tunnel Enter");
-
-    it = tnl_users_.find(dip); 
-    if(it != tnl_users_.end())
+    auto it = tnl_users_.find(dip); 
+    if (it != tnl_users_.end())
     {
        tnl_refcnts = it->second;
 
-       if(update_refcnt)
+       if (update_refcnt)
        {
          updateDipTunnelRefCnt(false,tnl_refcnts,usr);
          tnl_users_[dip] = tnl_refcnts;
        }
 
-       SWSS_LOG_INFO("diprefcnt = %d",tnl_refcnts.imr_refcnt + tnl_refcnts.mac_refcnt + tnl_refcnts.ip_refcnt);
+       SWSS_LOG_INFO("diprefcnt = %d",
+                     tnl_refcnts.imr_refcnt + tnl_refcnts.mac_refcnt + tnl_refcnts.ip_refcnt);
        
-       if(tnl_refcnts.imr_refcnt + tnl_refcnts.mac_refcnt + tnl_refcnts.ip_refcnt)
+       if (tnl_refcnts.imr_refcnt + tnl_refcnts.mac_refcnt + tnl_refcnts.ip_refcnt)
          return true;
 
-       if(tunnel_orch->getTunnelPort(dip, tunnelPort))
+       if (tunnel_orch->getTunnelPort(dip, tunnelPort))
        {
          SWSS_LOG_NOTICE("DIP = %s Not deleting tunnel from HW as tunnelPort is not yet deleted. fdbcount = %d",
                           dip.c_str(),tunnelPort.m_fdb_count);
@@ -1143,7 +1121,7 @@ bool VxlanTunnel::deleteDynamicDIPTunnel(const std::string dip, tunnel_user_type
        }
 
        dip_tunnel = tnl_refcnts.dip_tunnel;
-       if(!dip_tunnel)
+       if (!dip_tunnel)
        {
          SWSS_LOG_INFO("DIP Tunnel is NULL unexpected");
          return false;
@@ -1151,7 +1129,7 @@ bool VxlanTunnel::deleteDynamicDIPTunnel(const std::string dip, tunnel_user_type
 
        TUNNELMAP_SET_VLAN(mapper_list);
        TUNNELMAP_SET_VRF(mapper_list);
-       dip_tunnel->deleteTunnelHW(mapper_list,USE_COMMON_ENCAP_DECAP, false);
+       dip_tunnel->deleteTunnelHw(mapper_list,TUNNEL_MAP_USE_COMMON_ENCAP_DECAP, false);
 
        tnl_users_.erase(dip);
 
@@ -1161,7 +1139,7 @@ bool VxlanTunnel::deleteDynamicDIPTunnel(const std::string dip, tunnel_user_type
     }
     else 
     {
-       SWSS_LOG_WARN("Unable to find dynamic tunnel for deletion");
+        SWSS_LOG_WARN("Unable to find dynamic tunnel for deletion");
     }
 
     return true;
@@ -1170,11 +1148,12 @@ bool VxlanTunnel::deleteDynamicDIPTunnel(const std::string dip, tunnel_user_type
 //------------------- VxlanTunnelOrch Implementation --------------------------//
 
 sai_object_id_t
-VxlanTunnelOrch::createNextHopTunnel(string tunnelName, IpAddress& ipAddr, MacAddress macAddress, uint32_t vni)
+VxlanTunnelOrch::createNextHopTunnel(string tunnelName, IpAddress& ipAddr, 
+                                     MacAddress macAddress, uint32_t vni)
 {
     SWSS_LOG_ENTER();
 
-    if(!isTunnelExists(tunnelName))
+    if (!isTunnelExists(tunnelName))
     {
         SWSS_LOG_ERROR("Vxlan tunnel '%s' does not exists", tunnelName.c_str());
         return SAI_NULL_OBJECT_ID;
@@ -1225,7 +1204,7 @@ VxlanTunnelOrch::removeNextHopTunnel(string tunnelName, IpAddress& ipAddr, MacAd
                     tunnelName.c_str(), ipAddr.to_string().c_str(), 
                     macAddress.to_string().c_str(), vni);
 
-    if(!isTunnelExists(tunnelName))
+    if (!isTunnelExists(tunnelName))
     {
         SWSS_LOG_ERROR("Vxlan tunnel '%s' does not exists", tunnelName.c_str());
         return false;
@@ -1242,7 +1221,7 @@ bool VxlanTunnelOrch::createVxlanTunnelMap(string tunnelName, tunnel_map_type_t 
 {
     SWSS_LOG_ENTER();
 
-    if(!isTunnelExists(tunnelName))
+    if (!isTunnelExists(tunnelName))
     {
         SWSS_LOG_ERROR("Vxlan tunnel '%s' does not exists", tunnelName.c_str());
         return false;
@@ -1292,7 +1271,7 @@ bool VxlanTunnelOrch::removeVxlanTunnelMap(string tunnelName, uint32_t vni)
 {
     SWSS_LOG_ENTER();
 
-    if(!isTunnelExists(tunnelName))
+    if (!isTunnelExists(tunnelName))
     {
         SWSS_LOG_ERROR("Vxlan tunnel '%s' does not exists", tunnelName.c_str());
         return false;
@@ -1330,7 +1309,7 @@ bool VxlanTunnelOrch::removeVxlanTunnelMap(string tunnelName, uint32_t vni)
     // make SAI calls to delete the tunnel and tunnel termination objects.
 
     tunnel_obj->vlan_vrf_vni_count--;
-    if(tunnel_obj->vlan_vrf_vni_count == 0)
+    if (tunnel_obj->vlan_vrf_vni_count == 0)
     {
        auto tunnel_term_id = vxlan_tunnel_table_[tunnelName].get()->getTunnelTermId();
        try
@@ -1364,17 +1343,12 @@ bool VxlanTunnelOrch::addOperation(const Request& request)
     SWSS_LOG_ENTER();
 
     auto src_ip = request.getAttrIP("src_ip");
-    if (!src_ip.isV4())
-    {
-        SWSS_LOG_ERROR("Wrong format of the attribute: 'src_ip'. Currently only IPv4 address is supported");
-        return true;
-    }
 
     IpAddress dst_ip;
     auto attr_names = request.getAttrFieldNames();
     if (attr_names.count("dst_ip") == 0)
     {
-        if(src_ip.isV4()) {
+        if (src_ip.isV4()) {
             dst_ip = IpAddress("0.0.0.0");
         } else {
             dst_ip = IpAddress("::");
@@ -1383,7 +1357,7 @@ bool VxlanTunnelOrch::addOperation(const Request& request)
     else
     {
         dst_ip = request.getAttrIP("dst_ip");
-        if((src_ip.isV4() && !dst_ip.isV4()) ||
+        if ((src_ip.isV4() && !dst_ip.isV4()) ||
                (!src_ip.isV4() && dst_ip.isV4())) {
             SWSS_LOG_ERROR("Format mismatch: 'src_ip' and 'dst_ip' must be of the same family");
             return true;
@@ -1391,7 +1365,7 @@ bool VxlanTunnelOrch::addOperation(const Request& request)
     }
     const auto& tunnel_name = request.getKeyString(0);
 
-    if(isTunnelExists(tunnel_name))
+    if (isTunnelExists(tunnel_name))
     {
         SWSS_LOG_ERROR("Vxlan tunnel '%s' is already exists", tunnel_name.c_str());
         return true;
@@ -1409,14 +1383,14 @@ bool VxlanTunnelOrch::delOperation(const Request& request)
 
     const auto& tunnel_name = request.getKeyString(0);
 
-    if(!isTunnelExists(tunnel_name))
+    if (!isTunnelExists(tunnel_name))
     {
         SWSS_LOG_ERROR("Vxlan tunnel '%s' doesn't exist", tunnel_name.c_str());
         return true;
     }
 
     auto vtep_ptr = getVxlanTunnel(tunnel_name);
-    if(vtep_ptr && vtep_ptr->del_tnl_hw_pending)
+    if (vtep_ptr && vtep_ptr->del_tnl_hw_pending)
     {
       SWSS_LOG_WARN("VTEP %s not deleted as hw delete is pending", tunnel_name.c_str());
       return false;
@@ -1430,7 +1404,7 @@ bool VxlanTunnelOrch::delOperation(const Request& request)
 }
 
 bool  VxlanTunnelOrch::addTunnelUser(const std::string remote_vtep, uint32_t vni_id, 
-                                    uint32_t vlan, tunnel_user_type_e usr,
+                                    uint32_t vlan, tunnel_user_t usr,
                                     sai_object_id_t vrf_id)
 {
     EvpnNvoOrch* evpn_orch = gDirectory.get<EvpnNvoOrch*>();
@@ -1439,11 +1413,11 @@ bool  VxlanTunnelOrch::addTunnelUser(const std::string remote_vtep, uint32_t vni
     VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
     Port tunport;
 
-    if(TNL_SRC_MAC == usr) return true;
+    if (TUNNEL_USER_MAC == usr) return true;
 
     auto vtep_ptr = evpn_orch->getEVPNVtep();
 
-    if(!vtep_ptr)
+    if (!vtep_ptr)
     {
       SWSS_LOG_WARN("Unable to find EVPN VTEP. user=%d remote_vtep=%s",
                      usr,remote_vtep.c_str());
@@ -1463,73 +1437,63 @@ bool  VxlanTunnelOrch::addTunnelUser(const std::string remote_vtep, uint32_t vni
     SWSS_LOG_NOTICE("diprefcnt for remote %s = %d",
                      remote_vtep.c_str(), vtep_ptr->getDipTunnelRefCnt(remote_vtep));
 
-    if(!tunnel_orch->getTunnelPort(remote_vtep, tunport))
+    if (!tunnel_orch->getTunnelPort(remote_vtep, tunport))
     {
       Port tunnelPort;
-      auto port_tunnel_name = "Port_EVPN_" + remote_vtep;
-      SWSS_LOG_NOTICE("Creating Tunnel Port name = %s", port_tunnel_name.c_str());
+      auto port_tunnel_name = getTunnelPortName(remote_vtep);
       gPortsOrch->addTunnel(port_tunnel_name,dip_tunnel->getTunnelId(), false);
-      SWSS_LOG_NOTICE("Created Tunnel Port name = %s", port_tunnel_name.c_str());
       gPortsOrch->getPort(port_tunnel_name,tunnelPort);
       gPortsOrch->addBridgePort(tunnelPort);
-      SWSS_LOG_NOTICE("Created Tunnel BridgePort name = %s", port_tunnel_name.c_str());
     }
-
-    // TODO : Add Encap Mapper entry for DCI usecase
 
     return true;
 }
 
 bool  VxlanTunnelOrch::delTunnelUser(const std::string remote_vtep, uint32_t vni_id, 
-                                    uint32_t vlan, tunnel_user_type_e usr,
+                                    uint32_t vlan, tunnel_user_t usr,
                                     sai_object_id_t vrf_id)
 {
-    // TODO : Del Encap Mapper entry for DCI usecase
-
-    if(TNL_SRC_MAC == usr) return true;
+    if (TUNNEL_USER_MAC == usr) return true;
 
     // If this is the last request to delete the tunnel.
     auto tunnel_name = "EVPN_" + remote_vtep;
 
-    //if (isTunnelExists(tunnel_name))
+    auto port_tunnel_name = getTunnelPortName(remote_vtep);
+    EvpnNvoOrch* evpn_orch = gDirectory.get<EvpnNvoOrch*>();
+
+    auto vtep_ptr = evpn_orch->getEVPNVtep();
+
+    if (!vtep_ptr) 
     {
-        auto port_tunnel_name = "Port_EVPN_" + remote_vtep;
-        EvpnNvoOrch* evpn_orch = gDirectory.get<EvpnNvoOrch*>();
-
-        auto vtep_ptr = evpn_orch->getEVPNVtep();
-
-        if(!vtep_ptr) 
-        {
-          SWSS_LOG_WARN("Unable to find VTEP. remote=%s vlan=%d usr=%d",remote_vtep.c_str(), vlan, usr);
-          return true;
-        }
-
-        Port tunnelPort;
-        gPortsOrch->getPort(port_tunnel_name,tunnelPort);
-
-        if((vtep_ptr->getDipTunnelRefCnt(remote_vtep) == 1) &&
-           tunnelPort.m_fdb_count == 0)
-        {
-          bool ret;
-
-          ret = gPortsOrch->removeBridgePort(tunnelPort);
-          if(!ret) 
-          {
-            SWSS_LOG_ERROR("Remove Bridge port failed for remote = %s fdbcount = %d", 
-                            remote_vtep.c_str(), tunnelPort.m_fdb_count);
-            return true;
-          }
-        
-          gPortsOrch->removeTunnel(tunnelPort);
-        }
-
-        vtep_ptr->deleteDynamicDIPTunnel(remote_vtep, usr);
-        SWSS_LOG_NOTICE("diprefcnt for remote %s = %d",
-                         remote_vtep.c_str(), vtep_ptr->getDipTunnelRefCnt(remote_vtep));
-
-        vtep_ptr->deletePendingSIPTunnel();
-
+      SWSS_LOG_WARN("Unable to find VTEP. remote=%s vlan=%d usr=%d",
+                                         remote_vtep.c_str(), vlan, usr);
+      return true;
     }
+
+    Port tunnelPort;
+    gPortsOrch->getPort(port_tunnel_name,tunnelPort);
+
+    if ((vtep_ptr->getDipTunnelRefCnt(remote_vtep) == 1) &&
+       tunnelPort.m_fdb_count == 0)
+    {
+      bool ret;
+
+      ret = gPortsOrch->removeBridgePort(tunnelPort);
+      if (!ret) 
+      {
+        SWSS_LOG_ERROR("Remove Bridge port failed for remote = %s fdbcount = %d", 
+                        remote_vtep.c_str(), tunnelPort.m_fdb_count);
+        return true;
+      }
+    
+      gPortsOrch->removeTunnel(tunnelPort);
+    }
+
+    vtep_ptr->deleteDynamicDIPTunnel(remote_vtep, usr);
+    SWSS_LOG_NOTICE("diprefcnt for remote %s = %d",
+                     remote_vtep.c_str(), vtep_ptr->getDipTunnelRefCnt(remote_vtep));
+
+    vtep_ptr->deletePendingSIPTunnel();
 
     return true;
 }
@@ -1537,14 +1501,13 @@ bool  VxlanTunnelOrch::delTunnelUser(const std::string remote_vtep, uint32_t vni
 void VxlanTunnelOrch::deleteTunnelPort(Port &tunnelPort)
 {
     bool ret;
-    std::map<const std::string, tunnel_refcnt_t>::iterator it;
     EvpnNvoOrch* evpn_orch = gDirectory.get<EvpnNvoOrch*>();
     std::string remote_vtep;
+    int refcnt;
 
     auto vtep_ptr = evpn_orch->getEVPNVtep();
 
-    SWSS_LOG_INFO("Delete Tunnelport Enter");
-    if(!vtep_ptr) 
+    if (!vtep_ptr) 
     {
       SWSS_LOG_WARN("Unable to find VTEP. tunnelPort=%s",tunnelPort.m_alias.c_str());
       return;
@@ -1553,21 +1516,26 @@ void VxlanTunnelOrch::deleteTunnelPort(Port &tunnelPort)
     getTunnelDIPFromPort(tunnelPort, remote_vtep);
 
     //If there are IMR/IP routes to the remote VTEP then ignore this call
-    if(vtep_ptr->getDipTunnelRefCnt(remote_vtep))
-      return;
+    refcnt = vtep_ptr->getDipTunnelRefCnt(remote_vtep);
+    if (refcnt > 0)
+    {
+        SWSS_LOG_INFO("Tunnel bridge port not removed. remote = %s refcnt = %d", 
+                                                        remote_vtep.c_str(), refcnt);
+        return;
+    }
 
     // Remove Bridge port and Port objects for this DIP tunnel
     ret = gPortsOrch->removeBridgePort(tunnelPort);
-    if(!ret) 
+    if (!ret) 
     {
-      SWSS_LOG_ERROR("Remove Bridge port failed for remote = %s fdbcount = %d", 
+        SWSS_LOG_ERROR("Remove Bridge port failed for remote = %s fdbcount = %d", 
                       remote_vtep.c_str(), tunnelPort.m_fdb_count);
-      return;
+        return;
     }
     gPortsOrch->removeTunnel(tunnelPort);
 
     // Remove DIP Tunnel HW 
-    vtep_ptr->deleteDynamicDIPTunnel(remote_vtep, TNL_SRC_IMR, false);
+    vtep_ptr->deleteDynamicDIPTunnel(remote_vtep, TUNNEL_USER_IMR, false);
     SWSS_LOG_NOTICE("diprefcnt for remote %s = %d",
                      remote_vtep.c_str(), vtep_ptr->getDipTunnelRefCnt(remote_vtep));
 
@@ -1587,15 +1555,6 @@ void VxlanTunnelOrch::getTunnelName(string& tunnel_portname, string& tunnel_name
    return;
 }
 
-#if 0
-void VxlanTunnelOrch::getTunnelPortname(string& dip, string& tunnel_portname)
-{
-   tunnel_port_name = "Port_EVPN_" + dip;
-
-   return;
-}
-#endif
-
 void VxlanTunnelOrch:: getTunnelDIPFromPort(Port& tunnelPort, string& remote_vtep)
 {
     remote_vtep = tunnelPort.m_alias;
@@ -1609,10 +1568,14 @@ void VxlanTunnelOrch::updateDbTunnelOperStatus(string tunnel_portname,
    std::vector<FieldValueTuple> fvVector;
    std::string tunnel_name;
 
-   if(status == SAI_PORT_OPER_STATUS_UP)
-     fvVector.emplace_back("operstatus", "up");
+   if (status == SAI_PORT_OPER_STATUS_UP)
+   {
+       fvVector.emplace_back("operstatus", "up");
+   }
    else
-     fvVector.emplace_back("operstatus", "down");
+   {
+       fvVector.emplace_back("operstatus", "down");
+   }
 
    getTunnelName(tunnel_portname, tunnel_name);
 
@@ -1625,42 +1588,47 @@ void VxlanTunnelOrch::addRemoveStateTableEntry(string tunnel_name,
 
 {
     std::vector<FieldValueTuple> fvVector, tmpFvVector;
-    //WarmStart::WarmStartState state;
+    WarmStart::WarmStartState state;
 
-    //WarmStart::getWarmStartState("orchagent",state);
+    WarmStart::getWarmStartState("orchagent",state);
 
-    if(add)
+    if (add)
     {
       // Add tunnel entry only for non-warmboot case or WB with new tunnel coming up
       // during WB
-      //if ( (state != WarmStart::INITIALIZED) || 
-      //     !m_stateVxlanTable.get(tunnel_name, tmpFvVector))
-      if(1)
+      if ( (state != WarmStart::INITIALIZED) || 
+           !m_stateVxlanTable.get(tunnel_name, tmpFvVector))
       {
-        fvVector.emplace_back("src_ip", (sip.to_string()).c_str());
-        fvVector.emplace_back("dst_ip", (dip.to_string()).c_str());
-
-        if(src == TNL_CREATION_SRC_CLI)
-          fvVector.emplace_back("tnl_src", "CLI");
-        else 
-          fvVector.emplace_back("tnl_src", "EVPN");
-
-        fvVector.emplace_back("operstatus", "down");
-        m_stateVxlanTable.set(tunnel_name, fvVector);
-        SWSS_LOG_INFO("adding tunnel %s during warmboot", tunnel_name.c_str());
+          fvVector.emplace_back("src_ip", (sip.to_string()).c_str());
+          fvVector.emplace_back("dst_ip", (dip.to_string()).c_str());
+  
+          if (src == TNL_CREATION_SRC_CLI)
+          {
+              fvVector.emplace_back("tnl_src", "CLI");
+          }
+          else 
+          {
+              fvVector.emplace_back("tnl_src", "EVPN");
+          }
+  
+          fvVector.emplace_back("operstatus", "down");
+          m_stateVxlanTable.set(tunnel_name, fvVector);
+          SWSS_LOG_INFO("adding tunnel %s during warmboot", tunnel_name.c_str());
       }
       else
-        SWSS_LOG_NOTICE("Skip adding tunnel %s during warmboot", tunnel_name.c_str());
+      {
+          SWSS_LOG_NOTICE("Skip adding tunnel %s during warmboot", tunnel_name.c_str());
+      }
     }
     else
     {
-      m_stateVxlanTable.del(tunnel_name);
+        m_stateVxlanTable.del(tunnel_name);
     }
 }
 
 bool VxlanTunnelOrch::getTunnelPort(const std::string& remote_vtep,Port& tunnelPort)
 {
-    auto port_tunnel_name = "Port_EVPN_" + remote_vtep;
+    auto port_tunnel_name = getTunnelPortName(remote_vtep);
 
     bool ret = gPortsOrch->getPort(port_tunnel_name,tunnelPort);
 
@@ -1680,7 +1648,7 @@ bool VxlanTunnelMapOrch::addOperation(const Request& request)
     Port tempPort;
 
     const auto full_tunnel_map_entry_name = request.getFullKey();
-    SWSS_LOG_NOTICE("Full name = %s",full_tunnel_map_entry_name.c_str());
+    SWSS_LOG_INFO("Full name = %s",full_tunnel_map_entry_name.c_str());
 
     if (isTunnelMapExists(full_tunnel_map_entry_name))
     {
@@ -1689,7 +1657,7 @@ bool VxlanTunnelMapOrch::addOperation(const Request& request)
         return true;
     }
 
-    if(!gPortsOrch->getVlanByVlanId(vlan_id, tempPort))
+    if (!gPortsOrch->getVlanByVlanId(vlan_id, tempPort))
     {
         SWSS_LOG_WARN("Vxlan tunnel map vlan id doesn't exist: %d", vlan_id);
         return false;
@@ -1716,7 +1684,7 @@ bool VxlanTunnelMapOrch::addOperation(const Request& request)
  
     // The hw delete is pending due to an earlier incomplete operation. 
     // process this add event when the deletion is complete. 
-    if(tunnel_obj->del_tnl_hw_pending)
+    if (tunnel_obj->del_tnl_hw_pending)
     {
       SWSS_LOG_WARN("Tunnel Mapper deletion is pending");
       return false;
@@ -1729,7 +1697,7 @@ bool VxlanTunnelMapOrch::addOperation(const Request& request)
         uint8_t mapper_list = 0;
         TUNNELMAP_SET_VLAN(mapper_list);
         TUNNELMAP_SET_VRF(mapper_list);
-        tunnel_obj->createTunnelHW(mapper_list,USE_DEDICATED_ENCAP_DECAP);
+        tunnel_obj->createTunnelHw(mapper_list,TUNNEL_MAP_USE_DEDICATED_ENCAP_DECAP);
     }
 
     const auto tunnel_map_id = tunnel_obj->getDecapMapId(TUNNEL_MAP_T_VLAN);
@@ -1781,7 +1749,7 @@ bool VxlanTunnelMapOrch::delOperation(const Request& request)
     }
 
     auto vlan_id = (sai_vlan_id_t) vxlan_tunnel_map_table_[full_tunnel_map_entry_name].vlan_id;
-    if(!gPortsOrch->getVlanByVlanId(vlan_id, vlanPort))
+    if (!gPortsOrch->getVlanByVlanId(vlan_id, vlanPort))
     {
         SWSS_LOG_ERROR("Delete VLAN-VNI map.vlan id doesn't exist: %d", vlan_id);
         return true;
@@ -1817,16 +1785,16 @@ bool VxlanTunnelMapOrch::delOperation(const Request& request)
     // Update the map count and if this is the last mapping entry 
     // make SAI calls to delete the tunnel and tunnel termination objects.
 
-    if(tunnel_obj->vlan_vrf_vni_count == 0)
+    if (tunnel_obj->vlan_vrf_vni_count == 0)
     {
       // If there are Dynamic DIP Tunnels referring to this SIP Tunnel 
       // then mark it as pending for delete. 
-      if(tunnel_obj->getDipTunnelCnt() == 0)
+      if (tunnel_obj->getDipTunnelCnt() == 0)
       {
          uint8_t mapper_list=0;
          TUNNELMAP_SET_VLAN(mapper_list);
          TUNNELMAP_SET_VRF(mapper_list);
-         tunnel_obj->deleteTunnelHW(mapper_list, USE_DEDICATED_ENCAP_DECAP);
+         tunnel_obj->deleteTunnelHw(mapper_list, TUNNEL_MAP_USE_DEDICATED_ENCAP_DECAP);
       }
       else
       {
@@ -1845,7 +1813,8 @@ bool VxlanTunnelMapOrch::delOperation(const Request& request)
                                                       map_entries[1].c_str(), 
                                                       map_entries[2].c_str());
         uint32_t vni_id = static_cast<uint32_t>(stoul(map_entries[1]));
-        if (vni_id) {
+        if (vni_id) 
+        {
             tunnel_orch->delVlanMappedToVni(vni_id);
         }
     }
@@ -2010,21 +1979,21 @@ bool EvpnRemoteVniOrch::addOperation(const Request& request)
     VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
     Port tunnelPort, vlanPort;
 
-    if(!gPortsOrch->getVlanByVlanId(vlan_id, vlanPort))
+    if (!gPortsOrch->getVlanByVlanId(vlan_id, vlanPort))
     {
         SWSS_LOG_WARN("Vxlan tunnel map vlan id doesn't exist: %d", vlan_id);
         return false;
     }
 
-    if(tunnel_orch->getTunnelPort(remote_vtep,tunnelPort))
+    if (tunnel_orch->getTunnelPort(remote_vtep,tunnelPort))
     {
         SWSS_LOG_INFO("Vxlan tunnelPort exists: %s", remote_vtep.c_str());
 
-        if(gPortsOrch->isVlanMember(vlanPort, tunnelPort))
+        if (gPortsOrch->isVlanMember(vlanPort, tunnelPort))
         {
            EvpnNvoOrch* evpn_orch = gDirectory.get<EvpnNvoOrch*>();
            auto vtep_ptr = evpn_orch->getEVPNVtep();
-           if(!vtep_ptr)
+           if (!vtep_ptr)
            {
              SWSS_LOG_WARN("Remote VNI add: VTEP not found. remote=%s vid=%d",
                            remote_vtep.c_str(),vlan_id);
@@ -2037,9 +2006,9 @@ bool EvpnRemoteVniOrch::addOperation(const Request& request)
         }
     }
 
-    tunnel_orch->addTunnelUser(remote_vtep, vni_id, vlan_id, TNL_SRC_IMR);
+    tunnel_orch->addTunnelUser(remote_vtep, vni_id, vlan_id, TUNNEL_USER_IMR);
 
-    if(!tunnel_orch->getTunnelPort(remote_vtep,tunnelPort))
+    if (!tunnel_orch->getTunnelPort(remote_vtep,tunnelPort))
     {
       SWSS_LOG_WARN("Vxlan tunnelPort doesn't exist: %s", remote_vtep.c_str());
       return false;
@@ -2059,6 +2028,7 @@ bool EvpnRemoteVniOrch::addOperation(const Request& request)
 bool EvpnRemoteVniOrch::delOperation(const Request& request)
 {
     bool ret;
+
     SWSS_LOG_ENTER();
 
     // Extract DIP and tunnel
@@ -2079,13 +2049,13 @@ bool EvpnRemoteVniOrch::delOperation(const Request& request)
 
     VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
     Port vlanPort, tunnelPort;
-    if(!gPortsOrch->getVlanByVlanId(vlan_id, vlanPort))
+    if (!gPortsOrch->getVlanByVlanId(vlan_id, vlanPort))
     {
         SWSS_LOG_WARN("Vxlan tunnel map vlan id doesn't exist: %d", vlan_id);
         return true;
     }
 
-    if(!tunnel_orch->getTunnelPort(remote_vtep,tunnelPort))
+    if (!tunnel_orch->getTunnelPort(remote_vtep,tunnelPort))
     {
         SWSS_LOG_WARN("RemoteVniDel getTunnelPort Fails: %s", remote_vtep.c_str());
         return true;
@@ -2094,22 +2064,14 @@ bool EvpnRemoteVniOrch::delOperation(const Request& request)
     EvpnNvoOrch* evpn_orch = gDirectory.get<EvpnNvoOrch*>();
     auto vtep_ptr = evpn_orch->getEVPNVtep();
 
-    if(!vtep_ptr)
-      {
+    if (!vtep_ptr)
+    {
         SWSS_LOG_WARN("Remote VNI del: VTEP not found. remote=%s vid=%d",
                        remote_vtep.c_str(),vlan_id);
         return true;
-      }
+    }
 
-    // If VLAN is not member of the tunnel and 
-    // this is not a vlan which is pending delete
-    // consider it as spurious.
-#if 0
-    SWSS_LOG_NOTICE("ismember=%d vlan_pend_del=%d vlanid=%d",gPortsOrch->isVlanMember(vlanPort, tunnelPort), tunnelPort.m_tunnel_vlan_pending_delete, vlan_id);
-        (vlan_id != tunnelPort.m_tunnel_vlan_pending_delete))
-#endif
-
-    if(!gPortsOrch->isVlanMember(vlanPort, tunnelPort))
+    if (!gPortsOrch->isVlanMember(vlanPort, tunnelPort))
     {
        SWSS_LOG_WARN("marking it as spurious tunnelPort %s not a member of vid %d", 
                       remote_vtep.c_str(), vlan_id);
@@ -2117,20 +2079,20 @@ bool EvpnRemoteVniOrch::delOperation(const Request& request)
        return true;
     }
 
-    if(gPortsOrch->isVlanMember(vlanPort, tunnelPort)) 
+    if (gPortsOrch->isVlanMember(vlanPort, tunnelPort)) 
     {
-       if(!gPortsOrch->removeVlanMember(vlanPort, tunnelPort))
+       if (!gPortsOrch->removeVlanMember(vlanPort, tunnelPort))
        {
           SWSS_LOG_WARN("RemoteVniDel remove vlan member fails: %s",remote_vtep.c_str());
           return true;
        }
     }
 
-    SWSS_LOG_WARN("imrcount=%d fdbcount=%d ",
+    SWSS_LOG_INFO("imrcount=%d fdbcount=%d ",
                    vtep_ptr->getDipTunnelIMRRefCnt(remote_vtep), 
                    tunnelPort.m_fdb_count );
 
-    ret = tunnel_orch->delTunnelUser(remote_vtep, vni_id, vlan_id, TNL_SRC_IMR);
+    ret = tunnel_orch->delTunnelUser(remote_vtep, vni_id, vlan_id, TUNNEL_USER_IMR);
 
     SWSS_LOG_INFO("remote_vtep=%s vni=%d vlanid=%d ",
                    remote_vtep.c_str(), vni_id, vlan_id);
@@ -2150,7 +2112,6 @@ bool EvpnNvoOrch::addOperation(const Request& request)
 
     VxlanTunnelOrch* tunnel_orch = gDirectory.get<VxlanTunnelOrch*>();
 
-    // FIXME: Currently assumes only 1 VTEP
     source_vtep_ptr = tunnel_orch->getVxlanTunnel(vtep_name);
 
     SWSS_LOG_INFO("evpnnvo: %s vtep : %s \n",nvo_name.c_str(), vtep_name.c_str());
@@ -2164,16 +2125,16 @@ bool EvpnNvoOrch::delOperation(const Request& request)
 
     auto nvo_name = request.getKeyString(0);
 
-    if(!source_vtep_ptr) 
+    if (!source_vtep_ptr) 
     {
-       SWSS_LOG_WARN("NVO Delete failed as VTEP Ptr is NULL");
-       return true;
+        SWSS_LOG_WARN("NVO Delete failed as VTEP Ptr is NULL");
+        return true;
     }
 
-    if(source_vtep_ptr->del_tnl_hw_pending)
+    if (source_vtep_ptr->del_tnl_hw_pending)
     {
-      SWSS_LOG_WARN("NVO not deleted as hw delete is pending");
-      return false;
+        SWSS_LOG_WARN("NVO not deleted as hw delete is pending");
+        return false;
     }
 
     source_vtep_ptr = NULL;
