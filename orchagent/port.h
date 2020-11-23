@@ -20,6 +20,8 @@ extern "C" {
  */
 #define DEFAULT_MTU             1492
 
+#define VNID_NONE               0xFFFFFFFF
+
 namespace swss {
 
 struct VlanMemberEntry
@@ -104,7 +106,7 @@ public:
     sai_port_priority_flow_control_mode_t m_pfc_asym = SAI_PORT_PRIORITY_FLOW_CONTROL_MODE_COMBINED;
     uint8_t   m_pfc_bitmask = 0;
     uint32_t  m_nat_zone_id = 0;
-    uint32_t  m_vnid = 0xFFFFFFFF;
+    uint32_t  m_vnid = VNID_NONE;
     uint32_t  m_fdb_count = 0;
 
     /*

@@ -113,7 +113,6 @@ typedef struct tunnel_refcnts_s
    uint32_t      ip_refcnt;
    uint32_t      spurious_add_imr_refcnt;
    uint32_t      spurious_del_imr_refcnt;
-   VxlanTunnel*  dip_tunnel;
 } tunnel_refcnt_t;
 
 typedef struct tunnel_map_entry_s
@@ -194,7 +193,6 @@ public:
     int getDipTunnelIPRefCnt(const std::string);
     // Total DIP tunnels associated with this SIP tunnel.
     int getDipTunnelCnt();
-    VxlanTunnel* getDipTunnel(const std::string dip);
     bool createDynamicDIPTunnel(const string dip, tunnel_user_t usr);
     bool deleteDynamicDIPTunnel(const string dip, tunnel_user_t usr, bool update_refcnt = true);
     uint32_t vlan_vrf_vni_count = 0;
@@ -297,11 +295,6 @@ public:
 
     bool
     removeNextHopTunnel(string tunnelName, IpAddress& ipAddr, MacAddress macAddress, uint32_t vni=0);
-    std::string getTunnelPortName(const std::string& remote_vtep)
-    {
-        std::string tunnelPortName = "Port_EVPN_" + remote_vtep;
-        return tunnelPortName;
-    }
 
     bool getTunnelPort(const std::string& remote_vtep,Port& tunnelPort);
 
@@ -317,7 +310,9 @@ public:
 
     void addRemoveStateTableEntry(const string, IpAddress&, IpAddress&, tunnel_creation_src_t, bool);
 
-    void getTunnelName(string& tunnel_portname, string& tunnel_name);
+    std::string getTunnelPortName(const std::string& remote_vtep);
+    void getTunnelNameFromDIP(const string& dip, string& tunnel_name);
+    void getTunnelNameFromPort(string& tunnel_portname, string& tunnel_name);
     void getTunnelDIPFromPort(Port& tunnelPort, string& remote_vtep);
     void updateDbTunnelOperStatus(string tunnel_portname,
                                                sai_port_oper_status_t status);
