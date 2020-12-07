@@ -47,9 +47,9 @@ int main(int argc, char **argv)
     try
     {
 
-        DBConnector cfgDb(CONFIG_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
-        DBConnector appDb(APPL_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
-        DBConnector stateDb(STATE_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
+        DBConnector cfgDb("CONFIG_DB", 0);
+        DBConnector appDb("APPL_DB", 0);
+        DBConnector stateDb("STATE_DB", 0);
 
         WarmStart::initialize("vxlanmgrd", "swss");
         WarmStart::checkWarmStart("vxlanmgrd", "swss");
@@ -66,7 +66,9 @@ int main(int argc, char **argv)
         };
 
         VxlanMgr vxlanmgr(&cfgDb, &appDb, &stateDb, cfg_vnet_tables);
+
         std::vector<Orch *> cfgOrchList = {&vxlanmgr};
+
         swss::Select s;
         for (Orch *o : cfgOrchList)
         {
