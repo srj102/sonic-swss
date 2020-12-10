@@ -442,8 +442,8 @@ class VxlanTunnel(object):
         decapstr = '2:' + tunnel_map_id[0] + ',' + tunnel_map_id[2]
         encapstr = '2:' + tunnel_map_id[1] + ',' + tunnel_map_id[3]
 
-        print decapstr
-        print encapstr
+        print(decapstr)
+        print(encapstr)
 
         expected_tun_attributes = {
                         'SAI_TUNNEL_ATTR_TYPE': 'SAI_TUNNEL_TYPE_VXLAN',
@@ -588,24 +588,24 @@ class TestVxlanOrch(object):
         vlanlist = ['100', '101', '102']
         vnilist = ['1000', '1001', '1002']
 
-        print "Testing SIP Tunnel Creation"
+        print("Testing SIP Tunnel Creation")
         vxlan_obj.check_vxlan_sip_tunnel(dvs, tunnel_name, '6.6.6.6', vlanlist, vnilist)
-        print "Pass"
+        print("Pass")
 
-        print "Testing Tunnel Map Entry"
+        print("Testing Tunnel Map Entry")
         vxlan_obj.check_vxlan_tunnel_map_entry(dvs, tunnel_name, vlanlist, vnilist)
-        print "Pass"
+        print("Pass")
 
-        print "Testing Tunnel Map entry removal"
+        print("Testing Tunnel Map entry removal")
         remove_vxlan_tunnel_map(dvs, tunnel_name, map_name, '1000', 'Vlan100')
         remove_vxlan_tunnel_map(dvs, tunnel_name, map_name_1, '1001', 'Vlan101')
         remove_vxlan_tunnel_map(dvs, tunnel_name, map_name_2, '1002', 'Vlan102')
         vxlan_obj.check_vxlan_tunnel_map_entry_delete(dvs, tunnel_name, vlanlist, vnilist)
 
-        print "Testing SIP Tunnel Deletion"
+        print("Testing SIP Tunnel Deletion")
         remove_vxlan_tunnel(dvs, tunnel_name)
         vxlan_obj.check_vxlan_sip_tunnel_delete(dvs, tunnel_name)
-        print "Pass"
+        print("Pass")
 
 #       vxlan_obj.fetch_exist_entries(dvs)
 #       create_vxlan_tunnel(dvs, tunnel_name, '6.6.6.6')
@@ -615,7 +615,7 @@ class TestVxlanOrch(object):
 
 #       vxlan_obj.check_vxlan_sip_tunnel(dvs, tunnel_name, '6.6.6.6', vlanlist, vnilist)
 #       vxlan_obj.check_vxlan_tunnel_map_entry(dvs, tunnel_name, vlanlist, vnilist)
-#       print "Pass"
+#       print("Pass")
 
 #    Test 2 - DIP Tunnel Tests
 #    @pytest.mark.skip(reason="Starting Vxlanmgr to be merged")
@@ -642,65 +642,65 @@ class TestVxlanOrch(object):
         create_evpn_nvo(dvs, 'nvo1', tunnel_name)
         create_evpn_remote_vni(dvs, 'Vlan100', '7.7.7.7', '1000')
 
-        print "Testing DIP tunnel creation"
+        print("Testing DIP tunnel creation")
         vxlan_obj.check_vxlan_dip_tunnel(dvs, tunnel_name, '6.6.6.6', '7.7.7.7')
-        print "Pass"
-        print "Testing VLAN 100 extension"
+        print("Pass")
+        print("Testing VLAN 100 extension")
         vxlan_obj.check_vlan_extension(dvs, '100', '7.7.7.7')
-        print "Pass"
+        print("Pass")
 
         create_evpn_remote_vni(dvs, 'Vlan101', '7.7.7.7', '1001')
         create_evpn_remote_vni(dvs, 'Vlan102', '7.7.7.7', '1002')
 
-        print "Testing DIP tunnel not created again"
+        print("Testing DIP tunnel not created again")
         vxlan_obj.check_vxlan_dip_tunnel(dvs, tunnel_name, '6.6.6.6', '7.7.7.7')
-        print "Pass"
+        print("Pass")
 
-        print "Testing VLAN 101 extension"
+        print("Testing VLAN 101 extension")
         vxlan_obj.check_vlan_extension(dvs, '101', '7.7.7.7')
-        print "Pass"
+        print("Pass")
 
-        print "Testing VLAN 102 extension"
+        print("Testing VLAN 102 extension")
         vxlan_obj.check_vlan_extension(dvs, '102', '7.7.7.7')
-        print "Pass"
+        print("Pass")
 
-        print "Testing another DIP tunnel to 8.8.8.8"
+        print("Testing another DIP tunnel to 8.8.8.8")
         create_evpn_remote_vni(dvs, 'Vlan100', '8.8.8.8', '1000')
-        print "Testing DIP tunnel creation to 8.8.8.8"
+        print("Testing DIP tunnel creation to 8.8.8.8")
         vxlan_obj.check_vxlan_dip_tunnel(dvs, tunnel_name, '6.6.6.6', '8.8.8.8')
-        print "Pass"
-        print "Testing VLAN 100 extension to 8.8.8.8 and 7.7.7.7"
+        print("Pass")
+        print("Testing VLAN 100 extension to 8.8.8.8 and 7.7.7.7")
         vxlan_obj.check_vlan_extension(dvs, '100', '8.8.8.8')
         vxlan_obj.check_vlan_extension(dvs, '100', '7.7.7.7')
-        print "Pass"
+        print("Pass")
 
-        print "Testing Vlan Extension removal"
+        print("Testing Vlan Extension removal")
         remove_evpn_remote_vni(dvs, 'Vlan100', '7.7.7.7')
         remove_evpn_remote_vni(dvs, 'Vlan101', '7.7.7.7')
         vxlan_obj.check_vlan_extension_delete(dvs, '100', '7.7.7.7')
         vxlan_obj.check_vlan_extension_delete(dvs, '101', '7.7.7.7')
-        print "Testing DIP tunnel not deleted"
+        print("Testing DIP tunnel not deleted")
         vxlan_obj.check_vxlan_dip_tunnel(dvs, tunnel_name, '6.6.6.6', '7.7.7.7')
-        print "Pass"
+        print("Pass")
 
-        print "Testing Last Vlan removal and DIP tunnel delete"
+        print("Testing Last Vlan removal and DIP tunnel delete")
         remove_evpn_remote_vni(dvs, 'Vlan102', '7.7.7.7')
         vxlan_obj.check_vlan_extension_delete(dvs, '102', '7.7.7.7')
         vxlan_obj.check_vxlan_dip_tunnel_delete(dvs, '7.7.7.7')
-        print "Pass"
+        print("Pass")
 
-        print "Testing Last Vlan removal and DIP tunnel delete for 8.8.8.8"
+        print("Testing Last Vlan removal and DIP tunnel delete for 8.8.8.8")
         remove_evpn_remote_vni(dvs, 'Vlan100', '8.8.8.8')
         vxlan_obj.check_vlan_extension_delete(dvs, '100', '8.8.8.8')
         vxlan_obj.check_vxlan_dip_tunnel_delete(dvs, '8.8.8.8')
-        print "Pass"
+        print("Pass")
 
         remove_vxlan_tunnel_map(dvs, tunnel_name, map_name, '1000', 'Vlan100')
         remove_vxlan_tunnel_map(dvs, tunnel_name, map_name_1, '1001', 'Vlan101')
         remove_vxlan_tunnel_map(dvs, tunnel_name, map_name_2, '1002', 'Vlan102')
         vxlan_obj.check_vxlan_tunnel_map_entry_delete(dvs, tunnel_name, vlanlist, vnilist)
 
-        print "Testing SIP Tunnel Deletion"
+        print("Testing SIP Tunnel Deletion")
         remove_evpn_nvo(dvs, 'nvo1')
         remove_vxlan_tunnel(dvs, tunnel_name)
         vxlan_obj.check_vxlan_sip_tunnel_delete(dvs, tunnel_name)
@@ -729,21 +729,21 @@ class TestVxlanOrch(object):
         vlanlist = ['100', '101', '102']
         vnilist = ['1000', '1001', '1002']
 
-        print "Testing SIP Tunnel Creation"
+        print("Testing SIP Tunnel Creation")
         vxlan_obj.check_vxlan_sip_tunnel(dvs, tunnel_name, '6.6.6.6', vlanlist, vnilist, '2.2.2.2', False)
-        print "Pass"
+        print("Pass")
 
-        print "Testing Tunnel Map Entry"
+        print("Testing Tunnel Map Entry")
         vxlan_obj.check_vxlan_tunnel_map_entry(dvs, tunnel_name, vlanlist, vnilist)
-        print "Pass"
+        print("Pass")
 
-        print "Testing Tunnel Map entry removal"
+        print("Testing Tunnel Map entry removal")
         remove_vxlan_tunnel_map(dvs, tunnel_name, map_name, '1000', 'Vlan100')
         remove_vxlan_tunnel_map(dvs, tunnel_name, map_name_1, '1001', 'Vlan101')
         remove_vxlan_tunnel_map(dvs, tunnel_name, map_name_2, '1002', 'Vlan102')
         vxlan_obj.check_vxlan_tunnel_map_entry_delete(dvs, tunnel_name, vlanlist, vnilist)
 
-        print "Testing SIP Tunnel Deletion"
+        print("Testing SIP Tunnel Deletion")
         remove_vxlan_tunnel(dvs, tunnel_name)
         vxlan_obj.check_vxlan_sip_tunnel_delete(dvs, tunnel_name)
-        print "Pass"
+        print("Pass")
