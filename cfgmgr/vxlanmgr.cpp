@@ -421,7 +421,7 @@ bool VxlanMgr::doVxlanTunnelCreateTask(const KeyOpFieldsValuesTuple & t)
     }
 
     m_appVxlanTunnelTable.set(vxlanTunnelName, kfvFieldsValues(t));
-    m_vxlanTunnelCache[vxlanTunnelName] = tuncache;;
+    m_vxlanTunnelCache[vxlanTunnelName] = tuncache;
 
     SWSS_LOG_NOTICE("Create vxlan tunnel %s", vxlanTunnelName.c_str());
     return true;
@@ -466,6 +466,7 @@ bool VxlanMgr::doVxlanTunnelDeleteTask(const KeyOpFieldsValuesTuple & t)
 
 bool VxlanMgr::doVxlanTunnelMapCreateTask(const KeyOpFieldsValuesTuple & t)
 {
+    int ret;
     SWSS_LOG_ENTER();
 
     std::string vxlanTunnelMapName = kfvKey(t);
@@ -477,7 +478,7 @@ bool VxlanMgr::doVxlanTunnelMapCreateTask(const KeyOpFieldsValuesTuple & t)
         return true;
     }
 
-    SWSS_LOG_NOTICE("Create vxlan tunnel map %s", vxlanTunnelMapName.c_str());
+    SWSS_LOG_INFO("Create vxlan tunnel map %s", vxlanTunnelMapName.c_str());
     std::string vlan, vlan_id, vni_id, src_ip, dst_ip("");
     for (auto i : kfvFieldsValues(t))
     {
@@ -580,7 +581,12 @@ bool VxlanMgr::doVxlanTunnelMapCreateTask(const KeyOpFieldsValuesTuple & t)
     }
 
     createAppDBTunnelMapTable(t);
-    createVxlanNetdevice(vxlanTunnelName, vni_id, src_ip, dst_ip, vlan_id);
+    ret = createVxlanNetdevice(vxlanTunnelName, vni_id, src_ip, dst_ip, vlan_id);
+    if (ret != RET_SUCCESS)
+    {
+        SWSS_LOG_WARN("Vxlan Net Dev creation failure for %s VNI(%s) VLAN(%s)", 
+                       vxlanTunnelName.c_str(), vni_id.c_str(), vlan_id.c_str());
+    }
     
     std::string vxlan_dev_name;
     vxlan_dev_name = std::string("") + std::string(vxlanTunnelName) + "-" + std::string(vlan_id);
@@ -616,7 +622,7 @@ bool VxlanMgr::doVxlanTunnelMapDeleteTask(const KeyOpFieldsValuesTuple & t)
 
     SWSS_LOG_INFO("Delete vxlan tunnel map %s", vxlanTunnelMapName.c_str());
 
-  // ip link del dev {{VXLAN}}
+    // ip link del dev {{VXLAN}}
     size_t found = vxlanTunnelMapName.find(delimiter);
     const auto vxlanTunnelName = vxlanTunnelMapName.substr(0, found);
 
@@ -909,19 +915,19 @@ void VxlanMgr::createAppDBTunnelMapTable(const KeyOpFieldsValuesTuple & t)
         if (it != m_appVxlanTunnelMapKeysRecon.end())
         {
             m_appVxlanTunnelMapKeysRecon.erase(it);
-            SWSS_LOG_NOTICE("Reconcile App Tunnel Map Table create %s reconciled. Pending %lu",
+            SWSS_LOG_INFO("Reconcile App Tunnel Map Table create %s reconciled. Pending %lu",
                             vxlanTunnelMapName.c_str(), m_appVxlanTunnelMapKeysRecon.size());
             return;
         }
         else
         {
-            SWSS_LOG_NOTICE("Reconcile App Tunnel Map Table create %s doesnt not exist. Pending %lu",
+            SWSS_LOG_INFO("Reconcile App Tunnel Map Table create %s doesnt not exist. Pending %lu",
                             vxlanTunnelMapName.c_str(), m_appVxlanTunnelMapKeysRecon.size());
         }
     }
     else
     {
-        SWSS_LOG_NOTICE("App Tunnel Map Table create %s", vxlanTunnelMapName.c_str());
+        SWSS_LOG_INFO("App Tunnel Map Table create %s", vxlanTunnelMapName.c_str());
     }
     m_appVxlanTunnelMapTable.set(vxlanTunnelMapName, kfvFieldsValues(t));
 
@@ -937,7 +943,6 @@ int VxlanMgr::createVxlanNetdevice(std::string vxlanTunnelName, std::string vni_
                                    std::string src_ip, std::string dst_ip, 
                                    std::string vlan_id)
 {
-    int ret = 0;
     std::string res, cmds;
     std::string link_add_cmd, link_set_master_cmd, link_up_cmd; 
     std::string bridge_add_cmd, bridge_untagged_add_cmd, bridge_del_vid_cmd;
@@ -946,7 +951,7 @@ int VxlanMgr::createVxlanNetdevice(std::string vxlanTunnelName, std::string vni_
     vxlan_dev_name = std::string("") + std::string(vxlanTunnelName) + "-" + 
                      std::string(vlan_id);
 
-    SWSS_LOG_NOTICE("Kernel tnl_name: %s vni_id: %s src_ip: %s dst_ip:%s vlan_id: %s",
+    SWSS_LOG_INFO("Kernel tnl_name: %s vni_id: %s src_ip: %s dst_ip:%s vlan_id: %s",
                     vxlanTunnelName.c_str(), vni_id.c_str(), src_ip.c_str(), dst_ip.c_str(), 
                     vlan_id.c_str());
 
@@ -960,19 +965,19 @@ int VxlanMgr::createVxlanNetdevice(std::string vxlanTunnelName, std::string vni_
         if (it != m_vxlanNetDevices.end())
         {
             m_vxlanNetDevices.erase(it);
-            SWSS_LOG_NOTICE("Reconcile VxlanNetDevice %s reconciled. Pending %lu",
+            SWSS_LOG_INFO("Reconcile VxlanNetDevice %s reconciled. Pending %lu",
                             vxlan_dev_name.c_str(), m_vxlanNetDevices.size());
             return 0;
         }
         else
         {
-            SWSS_LOG_NOTICE("Reconcile VxlanNetDevice %s doesn't not exist. Pending %lu",
+            SWSS_LOG_INFO("Reconcile VxlanNetDevice %s does not exist. Pending %lu",
                             vxlan_dev_name.c_str(), m_vxlanNetDevices.size());
         }
     }
     else
     {
-        SWSS_LOG_NOTICE("Creating VxlanNetDevice %s", vxlan_dev_name.c_str());
+        SWSS_LOG_INFO("Creating VxlanNetDevice %s", vxlan_dev_name.c_str());
     }
 
     // ip link add <vxlan_dev_name> type vxlan id <vni> local <src_ip> remote <dst_ip> 
@@ -1016,17 +1021,14 @@ int VxlanMgr::createVxlanNetdevice(std::string vxlanTunnelName, std::string vni_
 
     cmds += link_up_cmd + "\"";
 
-    EXEC_WITH_ERROR_THROW(cmds, res);
-    return ret;
+    return swss::exec(cmds,res);
 }
 
 int VxlanMgr::deleteVxlanNetdevice(std::string vxlan_dev_name)
 {    
-    int ret = 0;
     std::string res;
     const std::string cmd = std::string("") + IP_CMD  + " link del dev " + vxlan_dev_name;
-    EXEC_WITH_ERROR_THROW(cmd, res);
-    return ret;
+    return swss::exec(cmd, res);
 }
 
 void VxlanMgr::getAllVxlanNetDevices()
@@ -1044,7 +1046,7 @@ void VxlanMgr::getAllVxlanNetDevices()
     auto lines = tokenize(stdout, '\n');
     for (const std::string & line : lines)
     {
-        SWSS_LOG_NOTICE("line : %s\n",line.c_str());
+        SWSS_LOG_INFO("line : %s\n",line.c_str());
         if (!std::regex_search(line, match_result, device_name_pattern))
         {
             continue;
@@ -1074,18 +1076,18 @@ void VxlanMgr::restoreVxlanNetDevices()
             {
                 std::string field = fvField(fv);
                 std::string value = fvValue(fv);
-                SWSS_LOG_NOTICE("RESTORE Vxlan Tunnel Table key: %s field: %s value: %s",
+                SWSS_LOG_INFO("RESTORE Vxlan Tunnel Table key: %s field: %s value: %s",
                         k.c_str(), field.c_str(), value.c_str());
                 if (field == "src_ip")
                 {
                     src_ip = value;
-                    SWSS_LOG_NOTICE("RESTORE Vxlan Tunnel Table src_ip: %s", src_ip.c_str());
+                    SWSS_LOG_INFO("RESTORE Vxlan Tunnel Table src_ip: %s", src_ip.c_str());
                 }
             }
         }
         else
         {
-            SWSS_LOG_NOTICE("RESTORE VxLAN Tunnel Table Key(%s)", k.c_str());
+            SWSS_LOG_INFO("RESTORE VxLAN Tunnel Table Key(%s)", k.c_str());
         }
     }
 
@@ -1104,7 +1106,7 @@ void VxlanMgr::restoreVxlanNetDevices()
             {
                 std::string field = fvField(fv);
                 std::string value = fvValue(fv);
-                SWSS_LOG_NOTICE("RESTORE Vxlan Tunnel MAP Table key: %s field: %s value: %s",
+                SWSS_LOG_INFO("RESTORE Vxlan Tunnel MAP Table key: %s field: %s value: %s",
                         vxlanTunnelMapName.c_str(), field.c_str(), value.c_str());
                 if (field == VLAN)
                 {
@@ -1118,7 +1120,7 @@ void VxlanMgr::restoreVxlanNetDevices()
         }
         else
         {
-            SWSS_LOG_NOTICE("RESTORE VxLAN Tunnel Map Table Key(%s)", vxlanTunnelMapName.c_str());
+            SWSS_LOG_INFO("RESTORE VxLAN Tunnel Map Table Key(%s)", vxlanTunnelMapName.c_str());
         }
         const auto vlan_prefix = std::string("Vlan");
         const auto prefix_len = vlan_prefix.length();
@@ -1127,13 +1129,20 @@ void VxlanMgr::restoreVxlanNetDevices()
         size_t found = vxlanTunnelMapName.find(delimiter);
         const auto vxlanTunnelName = vxlanTunnelMapName.substr(0, found);
 
-        createVxlanNetdevice(vxlanTunnelName, vni_id, src_ip, dst_ip, vlan_id);
-        SWSS_LOG_NOTICE("RESTORE Created Kernel Net Device (%s-%s)", vxlanTunnelName.c_str(), vlan_id.c_str());
+        int ret;
+        ret = createVxlanNetdevice(vxlanTunnelName, vni_id, src_ip, dst_ip, vlan_id);
+        if (ret != RET_SUCCESS)
+        {
+            SWSS_LOG_WARN("Vxlan Net Dev creation failure for %s VNI(%s) VLAN(%s)", 
+                          vxlanTunnelName.c_str(), vni_id.c_str(), vlan_id.c_str());
+        }
+
+        SWSS_LOG_INFO("RESTORE Created Kernel Net Device (%s-%s)", vxlanTunnelName.c_str(), vlan_id.c_str());
     }
 
-    SWSS_LOG_NOTICE("RESTORE Delete Stale Kernel Net Devices");
+    SWSS_LOG_INFO("RESTORE Delete Stale Kernel Net Devices");
     clearAllVxlanDevices();
-    SWSS_LOG_NOTICE("RESTORE Recreate Kernel Cache");
+    SWSS_LOG_INFO("RESTORE Recreate Kernel Cache");
     getAllVxlanNetDevices();
 }
 
@@ -1141,7 +1150,7 @@ void VxlanMgr::clearAllVxlanDevices()
 {
     for (auto it = m_vxlanNetDevices.begin(); it != m_vxlanNetDevices.end();)
     {
-        SWSS_LOG_NOTICE("Deleting Stale NetDevice vxlandevname %s\n", (it->first).c_str());
+        SWSS_LOG_INFO("Deleting Stale NetDevice vxlandevname %s\n", (it->first).c_str());
         deleteVxlanNetdevice(it->first);
         it = m_vxlanNetDevices.erase(it);
     }
@@ -1157,10 +1166,10 @@ void VxlanMgr::waitTillReadyToReconcile()
         if ((WarmStart::REPLAYED == state) ||
             (WarmStart::RECONCILED == state))
         {
-            SWSS_LOG_NOTICE("Vlanmgrd Reconciled %d", (int) state);
+            SWSS_LOG_INFO("Vlanmgrd Reconciled %d", (int) state);
             return;
         }
-        SWSS_LOG_NOTICE("Vlanmgrd NOT Reconciled %d", (int) state);            
+        SWSS_LOG_INFO("Vlanmgrd NOT Reconciled %d", (int) state);            
         sleep(1);
     }
     return;
@@ -1173,9 +1182,9 @@ void VxlanMgr::beginReconcile(bool warm)
     vxlanAppTunnelMapTable.getKeys(m_appVxlanTunnelMapKeysRecon);
     for (auto &k : m_appVxlanTunnelMapKeysRecon)
     {
-        SWSS_LOG_NOTICE("App Tunnel Map Key: %s", k.c_str());
+        SWSS_LOG_INFO("App Tunnel Map Key: %s", k.c_str());
     }
-    SWSS_LOG_NOTICE("Pending %lu entries for the Tunnel Map Table", m_appVxlanTunnelMapKeysRecon.size());
+    SWSS_LOG_INFO("Pending %lu entries for the Tunnel Map Table", m_appVxlanTunnelMapKeysRecon.size());
     return;
 }
 
@@ -1187,12 +1196,12 @@ void VxlanMgr::endReconcile(bool warm)
         std::vector<std::string>::iterator it = m_appVxlanTunnelMapKeysRecon.begin();
         if (it != m_appVxlanTunnelMapKeysRecon.end())
         {
-            SWSS_LOG_NOTICE("Reconcile Deleting Stale Entry vxlandevname %s\n", m_appVxlanTunnelMapKeysRecon[0].c_str());
+            SWSS_LOG_INFO("Reconcile Deleting Stale Entry vxlandevname %s\n", m_appVxlanTunnelMapKeysRecon[0].c_str());
             delAppDBTunnelMapTable(m_appVxlanTunnelMapKeysRecon[0]);
             m_appVxlanTunnelMapKeysRecon.erase(it);
         }
     }
-    SWSS_LOG_NOTICE("End App Tunnel Map Table Reconcile");
+    SWSS_LOG_INFO("End App Tunnel Map Table Reconcile");
 
     /* Delete all the stale netDevices from the Kernel */
     clearAllVxlanDevices();
