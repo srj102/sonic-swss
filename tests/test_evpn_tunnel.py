@@ -111,11 +111,11 @@ def get_key_with_attr(db, table, expected_attributes ):
     return retkey
        
       
-def create_evpn_nvo(dvs, nvoname, tnlname):
+def create_evpn_nvo(dvs, nvoname, tnl_name):
     conf_db = swsscommon.DBConnector(swsscommon.CONFIG_DB, dvs.redis_sock, 0)
 
     attrs = [
-            ("source_vtep", tnlname),
+            ("source_vtep", tnl_name),
     ]
 
     # create the VXLAN tunnel Term entry in Config DB
@@ -146,7 +146,7 @@ def create_vxlan_tunnel(dvs, name, src_ip, dst_ip = '0.0.0.0', skip_dst_ip=True)
         attrs,
     )
 
-def create_vxlan_tunnel_map(dvs, tnlname, mapname, vni_id, vlan_id):
+def create_vxlan_tunnel_map(dvs, tnl_name, map_name, vni_id, vlan_id):
     conf_db = swsscommon.DBConnector(swsscommon.CONFIG_DB, dvs.redis_sock, 0)
 
     attrs = [
@@ -157,31 +157,31 @@ def create_vxlan_tunnel_map(dvs, tnlname, mapname, vni_id, vlan_id):
     # create the VXLAN tunnel Term entry in Config DB
     create_entry_tbl(
         conf_db,
-        "VXLAN_TUNNEL_MAP", '|', "%s|%s" % (tnlname, mapname),
+        "VXLAN_TUNNEL_MAP", '|', "%s|%s" % (tnl_name, map_name),
         attrs,
     )
 
-def create_evpn_remote_vni(dvs, vlan_id, remotevtep, vnid):
+def create_evpn_remote_vni(dvs, vlan_id, remote_vtep, vnid):
     app_db = swsscommon.DBConnector(swsscommon.APPL_DB, dvs.redis_sock, 0)
     create_entry_pst(
         app_db,
-        "VXLAN_REMOTE_VNI_TABLE", ':', "%s:%s" % (vlan_id, remotevtep),
+        "VXLAN_REMOTE_VNI_TABLE", ':', "%s:%s" % (vlan_id, remote_vtep),
         [
             ("vni", vnid),
         ],
     )
     time.sleep(2)
 
-def remove_vxlan_tunnel(dvs, tnlname):
+def remove_vxlan_tunnel(dvs, tnl_name):
     conf_db = swsscommon.DBConnector(swsscommon.CONFIG_DB, dvs.redis_sock, 0)
 
     # create the VXLAN tunnel Term entry in Config DB
     delete_entry_tbl(
         conf_db,
-        "VXLAN_TUNNEL", tnlname,
+        "VXLAN_TUNNEL", tnl_name,
     )
 
-def remove_vxlan_tunnel_map(dvs, tnlname, mapname,vni_id, vlan_id):
+def remove_vxlan_tunnel_map(dvs, tnl_name, map_name,vni_id, vlan_id):
     conf_db = swsscommon.DBConnector(swsscommon.CONFIG_DB, dvs.redis_sock, 0)
 
     attrs = [
@@ -192,14 +192,14 @@ def remove_vxlan_tunnel_map(dvs, tnlname, mapname,vni_id, vlan_id):
     # create the VXLAN tunnel Term entry in Config DB
     delete_entry_tbl(
         conf_db,
-        "VXLAN_TUNNEL_MAP", "%s|%s" % (tnlname, mapname),
+        "VXLAN_TUNNEL_MAP", "%s|%s" % (tnl_name, map_name),
     )
 
-def remove_evpn_remote_vni(dvs, vlan_id, remotevtep ):
+def remove_evpn_remote_vni(dvs, vlan_id, remote_vtep ):
     app_db = swsscommon.DBConnector(swsscommon.APPL_DB, dvs.redis_sock, 0)
     delete_entry_pst(
         app_db,
-        "VXLAN_REMOTE_VNI_TABLE", "%s:%s" % (vlan_id, remotevtep),
+        "VXLAN_REMOTE_VNI_TABLE", "%s:%s" % (vlan_id, remote_vtep),
     )
     time.sleep(2)
 
@@ -237,11 +237,10 @@ class VxlanTunnel(object):
     tunnel_map_map       = {}
     tunnel               = {}
     tunnel_appdb         = {}
-    tunnelterm           = {}
-    mapentry_map         = {}
-    diptunnel_map        = {}
-    diptunterm_map       = {}
-    diptunstate_map      = {}
+    tunnel_term          = {}
+    map_entry_map        = {}
+    dip_tunnel_map       = {}
+    dip_tun_state_map    = {}
     bridgeport_map       = {}
     vlan_id_map          = {}
     vlan_member_map      = {}
@@ -259,7 +258,7 @@ class VxlanTunnel(object):
         tbl = swsscommon.Table(asic_db, self.ASIC_TUNNEL_MAP_ENTRY)
 
         for x in range(len(vidlist)):
-            status, fvs = tbl.get(self.mapentry_map[tunnel_name + vidlist[x]])
+            status, fvs = tbl.get(self.map_entry_map[tunnel_name + vidlist[x]])
             assert status == False, "SIP Tunnel Map entry not deleted"
             iplinkcmd = "ip link show type vxlan dev " + tunnel_name + "-" + vidlist[x]
             (exitcode, out) = dvs.runcmd(iplinkcmd)
@@ -283,7 +282,7 @@ class VxlanTunnel(object):
             ret = get_key_with_attr(asic_db, self.ASIC_TUNNEL_MAP_ENTRY, expected_attributes_1)
             assert len(ret) > 0, "SIP TunnelMap entry not created"
             assert len(ret) == 1, "More than 1 SIP TunnMapEntry created"
-            self.mapentry_map[tunnel_name + vidlist[x]] = ret[0]
+            self.map_entry_map[tunnel_name + vidlist[x]] = ret[0]
             iplinkcmd = "ip link show type vxlan dev " + tunnel_name + "-" + vidlist[x]
             (exitcode, out) = dvs.runcmd(iplinkcmd)
             assert exitcode == 0, "Kernel device not created"
@@ -295,30 +294,29 @@ class VxlanTunnel(object):
 
         tbl = swsscommon.Table(app_db, "VXLAN_TUNNEL_TABLE")
         status, fvs = tbl.get(self.tunnel_appdb[tunnel_name])
-        assert status == False, "SIP Tunnel entry not deleted"
+        assert status == False, "SIP Tunnel entry not deleted from APP_DB"
 
         tbl = swsscommon.Table(asic_db, self.ASIC_TUNNEL_TERM_ENTRY)
-        status, fvs = tbl.get(self.tunnelterm[tunnel_name])
-        assert status == False, "SIP Tunnel Term entry not deleted"
+        status, fvs = tbl.get(self.tunnel_term[tunnel_name])
+        assert status == False, "SIP Tunnel Term entry not deleted from ASIC_DB"
 
         tbl = swsscommon.Table(asic_db, self.ASIC_TUNNEL_TABLE)
         status, fvs = tbl.get(self.tunnel[tunnel_name])
-        assert status == False, "SIP Tunnel entry not deleted"
+        assert status == False, "SIP Tunnel entry not deleted from ASIC_DB"
 
         tbl = swsscommon.Table(asic_db, self.ASIC_TUNNEL_MAP)
         status, fvs = tbl.get(self.tunnel_map_map[tunnel_name][0])
-        assert status == False, "SIP Tunnel mapper0 not deleted"
+        assert status == False, "SIP Tunnel mapper0 not deleted from ASIC_DB"
         status, fvs = tbl.get(self.tunnel_map_map[tunnel_name][1])
-        assert status == False, "SIP Tunnel mapper1 not deleted"
+        assert status == False, "SIP Tunnel mapper1 not deleted from ASIC_DB"
         status, fvs = tbl.get(self.tunnel_map_map[tunnel_name][2])
-        assert status == False, "SIP Tunnel mapper2 not deleted"
+        assert status == False, "SIP Tunnel mapper2 not deleted from ASIC_DB"
         status, fvs = tbl.get(self.tunnel_map_map[tunnel_name][3])
-        assert status == False, "SIP Tunnel mapper3 not deleted"
+        assert status == False, "SIP Tunnel mapper3 not deleted from ASIC_DB"
 
     def check_vxlan_sip_tunnel(self, dvs, tunnel_name, src_ip, vidlist, vnidlist, dst_ip = '0.0.0.0', skip_dst_ip = 'True'):
         asic_db = swsscommon.DBConnector(swsscommon.ASIC_DB, dvs.redis_sock, 0)
         app_db = swsscommon.DBConnector(swsscommon.APPL_DB, dvs.redis_sock, 0)
-#        global loopback_id, def_vr_id
 
         tunnel_map_id  = get_created_entries(asic_db, self.ASIC_TUNNEL_MAP, self.tunnel_map_ids, 4)
         tunnel_id      = get_created_entry(asic_db, self.ASIC_TUNNEL_TABLE, self.tunnel_ids)
@@ -399,22 +397,18 @@ class VxlanTunnel(object):
         self.tunnel_term_ids.add(tunnel_term_id)
         self.tunnel_map_map[tunnel_name] = tunnel_map_id
         self.tunnel[tunnel_name] = tunnel_id
-        self.tunnelterm[tunnel_name] = tunnel_term_id
+        self.tunnel_term[tunnel_name] = tunnel_term_id
 
     def check_vxlan_dip_tunnel_delete(self, dvs, dip):
         asic_db = swsscommon.DBConnector(swsscommon.ASIC_DB, dvs.redis_sock, 0)
         state_db = swsscommon.DBConnector(swsscommon.STATE_DB, dvs.redis_sock, 0)
 
         tbl = swsscommon.Table(state_db, 'VXLAN_TUNNEL_TABLE')
-        status, fvs = tbl.get(self.diptunstate_map[dip])
+        status, fvs = tbl.get(self.dip_tun_state_map[dip])
         assert status == False, "State Table entry not deleted"
 
-        #tbl = swsscommon.Table(asic_db, self.ASIC_TUNNEL_TERM_ENTRY)
-        #status, fvs = tbl.get(self.diptunterm_map[dip])
-        #assert status == False, "Tunnel Term entry not deleted"
-
         tbl = swsscommon.Table(asic_db, self.ASIC_TUNNEL_TABLE)
-        status, fvs = tbl.get(self.diptunnel_map[dip])
+        status, fvs = tbl.get(self.dip_tunnel_map[dip])
         assert status == False, "Tunnel entry not deleted"
 
         tbl = swsscommon.Table(asic_db, self.ASIC_BRIDGE_PORT)
@@ -434,7 +428,7 @@ class VxlanTunnel(object):
         ret = get_key_with_attr(state_db, 'VXLAN_TUNNEL_TABLE', expected_state_attributes)
         assert len(ret) > 0, "Tunnel Statetable entry not created"
         assert len(ret) == 1, "More than 1 Tunn statetable entry created"
-        self.diptunstate_map[dip] = ret[0]
+        self.dip_tun_state_map[dip] = ret[0]
 
 
         tunnel_map_id = self.tunnel_map_map[vtep_name]
@@ -454,22 +448,11 @@ class VxlanTunnel(object):
                         'SAI_TUNNEL_ATTR_ENCAP_DST_IP': dip,
                     }
            
-
-#        check_object(asic_db, self.ASIC_TUNNEL_TABLE, tunnel_id, expected_tun_attributes)
-
         ret = get_key_with_attr(asic_db, self.ASIC_TUNNEL_TABLE, expected_tun_attributes)
         assert len(ret) > 0, "Tunnel entry not created"
         assert len(ret) == 1, "More than 1 tunnel entry created"
 
-#       tbl = swsscommon.Table(asic_db, self.ASIC_TUNNEL_ENTRY)
-#       status, fvs = tbl.get(ret[0])
-#       assert status, "Got an error when get a key"
-#       for name, value in fvs:
-#           if name == 'SAI_TUNNEL_TERM_TABLE_ENTRY_ATTR_ACTION_TUNNEL_ID':
-#              tunnel_id = value
-#              break
-
-        self.diptunnel_map[dip] = ret[0]
+        self.dip_tunnel_map[dip] = ret[0]
         tunnel_id = ret[0]
 
         expected_bridgeport_attributes = {
@@ -501,19 +484,7 @@ class VxlanTunnel(object):
         assert len(ret) > 0, "VLAN entry not created"
         assert len(ret) == 1, "More than 1 VLAN entry created"
 
-#       tbl = swsscommon.Table(asic_db, 'ASIC_STATE:SAI_OBJECT_TYPE_VLAN')
-#       status, fvs = tbl.get(ret[0])
-#       assert status, "Got an error when get a key"
-#       for name, value in fvs:
-#           if name == 'SAI_VLAN_ATTR_VLAN_ID':
-#              self.vlan_id_map[vlan_name] = value
-#              break
-
         self.vlan_id_map[vlan_name] = ret[0]
-#       print "printingvlanid"
-#       print self.vlan_id_map[vlan_name]
-#       print "printingbridgeport"
-#       print self.bridgeport_map[dip]
 
         expected_vlan_member_attributes = {
             'SAI_VLAN_MEMBER_ATTR_VLAN_ID': self.vlan_id_map[vlan_name],
@@ -566,7 +537,6 @@ class TestVxlanOrch(object):
         return VxlanTunnel()
 
 #    Test 1 - Create and Delete SIP Tunnel and Map entries
-#    @pytest.mark.skip(reason="Starting Vxlanmgr to be merged")
     def test_p2mp_tunnel(self, dvs, testlog):
         vxlan_obj = self.get_vxlan_obj()
 
@@ -590,11 +560,9 @@ class TestVxlanOrch(object):
 
         print("Testing SIP Tunnel Creation")
         vxlan_obj.check_vxlan_sip_tunnel(dvs, tunnel_name, '6.6.6.6', vlanlist, vnilist)
-        print("Pass")
 
         print("Testing Tunnel Map Entry")
         vxlan_obj.check_vxlan_tunnel_map_entry(dvs, tunnel_name, vlanlist, vnilist)
-        print("Pass")
 
         print("Testing Tunnel Map entry removal")
         remove_vxlan_tunnel_map(dvs, tunnel_name, map_name, '1000', 'Vlan100')
@@ -605,21 +573,8 @@ class TestVxlanOrch(object):
         print("Testing SIP Tunnel Deletion")
         remove_vxlan_tunnel(dvs, tunnel_name)
         vxlan_obj.check_vxlan_sip_tunnel_delete(dvs, tunnel_name)
-        print("Pass")
-
-#       vxlan_obj.fetch_exist_entries(dvs)
-#       create_vxlan_tunnel(dvs, tunnel_name, '6.6.6.6')
-#       create_vxlan_tunnel_map(dvs, tunnel_name, map_name, '1000', 'Vlan100')
-#       create_vxlan_tunnel_map(dvs, tunnel_name, map_name_1, '1001', 'Vlan101')
-#       create_vxlan_tunnel_map(dvs, tunnel_name, map_name_2, '1002', 'Vlan102')
-
-#       vxlan_obj.check_vxlan_sip_tunnel(dvs, tunnel_name, '6.6.6.6', vlanlist, vnilist)
-#       vxlan_obj.check_vxlan_tunnel_map_entry(dvs, tunnel_name, vlanlist, vnilist)
-#       print("Pass")
 
 #    Test 2 - DIP Tunnel Tests
-#    @pytest.mark.skip(reason="Starting Vxlanmgr to be merged")
-    @pytest.mark.dev_sanity
     def test_p2p_tunnel(self, dvs, testlog):
         vxlan_obj = self.get_vxlan_obj()
 
@@ -644,35 +599,28 @@ class TestVxlanOrch(object):
 
         print("Testing DIP tunnel creation")
         vxlan_obj.check_vxlan_dip_tunnel(dvs, tunnel_name, '6.6.6.6', '7.7.7.7')
-        print("Pass")
         print("Testing VLAN 100 extension")
         vxlan_obj.check_vlan_extension(dvs, '100', '7.7.7.7')
-        print("Pass")
 
         create_evpn_remote_vni(dvs, 'Vlan101', '7.7.7.7', '1001')
         create_evpn_remote_vni(dvs, 'Vlan102', '7.7.7.7', '1002')
 
         print("Testing DIP tunnel not created again")
         vxlan_obj.check_vxlan_dip_tunnel(dvs, tunnel_name, '6.6.6.6', '7.7.7.7')
-        print("Pass")
 
         print("Testing VLAN 101 extension")
         vxlan_obj.check_vlan_extension(dvs, '101', '7.7.7.7')
-        print("Pass")
 
         print("Testing VLAN 102 extension")
         vxlan_obj.check_vlan_extension(dvs, '102', '7.7.7.7')
-        print("Pass")
 
         print("Testing another DIP tunnel to 8.8.8.8")
         create_evpn_remote_vni(dvs, 'Vlan100', '8.8.8.8', '1000')
         print("Testing DIP tunnel creation to 8.8.8.8")
         vxlan_obj.check_vxlan_dip_tunnel(dvs, tunnel_name, '6.6.6.6', '8.8.8.8')
-        print("Pass")
         print("Testing VLAN 100 extension to 8.8.8.8 and 7.7.7.7")
         vxlan_obj.check_vlan_extension(dvs, '100', '8.8.8.8')
         vxlan_obj.check_vlan_extension(dvs, '100', '7.7.7.7')
-        print("Pass")
 
         print("Testing Vlan Extension removal")
         remove_evpn_remote_vni(dvs, 'Vlan100', '7.7.7.7')
@@ -681,19 +629,16 @@ class TestVxlanOrch(object):
         vxlan_obj.check_vlan_extension_delete(dvs, '101', '7.7.7.7')
         print("Testing DIP tunnel not deleted")
         vxlan_obj.check_vxlan_dip_tunnel(dvs, tunnel_name, '6.6.6.6', '7.7.7.7')
-        print("Pass")
 
         print("Testing Last Vlan removal and DIP tunnel delete")
         remove_evpn_remote_vni(dvs, 'Vlan102', '7.7.7.7')
         vxlan_obj.check_vlan_extension_delete(dvs, '102', '7.7.7.7')
         vxlan_obj.check_vxlan_dip_tunnel_delete(dvs, '7.7.7.7')
-        print("Pass")
 
         print("Testing Last Vlan removal and DIP tunnel delete for 8.8.8.8")
         remove_evpn_remote_vni(dvs, 'Vlan100', '8.8.8.8')
         vxlan_obj.check_vlan_extension_delete(dvs, '100', '8.8.8.8')
         vxlan_obj.check_vxlan_dip_tunnel_delete(dvs, '8.8.8.8')
-        print("Pass")
 
         remove_vxlan_tunnel_map(dvs, tunnel_name, map_name, '1000', 'Vlan100')
         remove_vxlan_tunnel_map(dvs, tunnel_name, map_name_1, '1001', 'Vlan101')
@@ -707,7 +652,6 @@ class TestVxlanOrch(object):
 
 
 #    Test 3 - Create and Delete SIP Tunnel and Map entries
-#    @pytest.mark.skip(reason="Starting Vxlanmgr to be merged")
     def test_p2mp_tunnel_with_dip(self, dvs, testlog):
         vxlan_obj = self.get_vxlan_obj()
 
@@ -731,11 +675,9 @@ class TestVxlanOrch(object):
 
         print("Testing SIP Tunnel Creation")
         vxlan_obj.check_vxlan_sip_tunnel(dvs, tunnel_name, '6.6.6.6', vlanlist, vnilist, '2.2.2.2', False)
-        print("Pass")
 
         print("Testing Tunnel Map Entry")
         vxlan_obj.check_vxlan_tunnel_map_entry(dvs, tunnel_name, vlanlist, vnilist)
-        print("Pass")
 
         print("Testing Tunnel Map entry removal")
         remove_vxlan_tunnel_map(dvs, tunnel_name, map_name, '1000', 'Vlan100')
@@ -746,4 +688,3 @@ class TestVxlanOrch(object):
         print("Testing SIP Tunnel Deletion")
         remove_vxlan_tunnel(dvs, tunnel_name)
         vxlan_obj.check_vxlan_sip_tunnel_delete(dvs, tunnel_name)
-        print("Pass")
